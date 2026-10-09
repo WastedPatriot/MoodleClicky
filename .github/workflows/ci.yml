@@ -38,11 +38,14 @@ jobs:
           MC_SKIP_WHISPER: "1"
         run: pytest -q
       - name: Self-test from source (real windows, real screenshot)
+        timeout-minutes: 6
         run: python -m moodleclicky --selftest
       - name: Build MoodleClicky.exe + self-test the build
+        timeout-minutes: 25
         shell: pwsh
         run: ./tools/build_windows.ps1
       - name: Installer test (install from the built zip, setup menu, launch, uninstall)
+        timeout-minutes: 8
         shell: pwsh
         run: |
           "1`nsk-ant-ci-not-a-real-key`nCI`nTest course`n1`n1`nn`ny`ny`n1`n" | pwsh -NoProfile -File install.ps1 -Zip dist/MoodleClicky-windows.zip

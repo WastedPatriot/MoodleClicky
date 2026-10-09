@@ -1,7 +1,7 @@
 # MoodleClicky installer / updater / setup menu / uninstaller (Windows PowerShell 5.1+ or PowerShell 7).
 #
 #   Install or update (paste into PowerShell):
-#     irm https://raw.githubusercontent.com/WastedPatriot/moodleclicky/main/install.ps1 | iex
+#     irm https://raw.githubusercontent.com/WastedPatriot/MoodleClicky/main/install.ps1 | iex
 #   Re-run just the setup menu:   Start menu -> "MoodleClicky Setup"
 #   Uninstall:                    Start menu -> "Uninstall MoodleClicky"
 #
@@ -15,7 +15,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"   # makes downloads much faster on Windows PowerShell
-$Repo = "WastedPatriot/moodleclicky"
+$Repo = "WastedPatriot/MoodleClicky"
 $Dir = Join-Path $env:LOCALAPPDATA "Programs\MoodleClicky"
 $Exe = Join-Path $Dir "MoodleClicky.exe"
 $Data = Join-Path $env:APPDATA "MoodleClicky"

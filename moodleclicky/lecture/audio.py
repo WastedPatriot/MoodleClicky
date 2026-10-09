@@ -29,9 +29,19 @@ def write_wav(path: Path, samples: np.ndarray) -> None:
 
 
 def read_wav(path: Path) -> np.ndarray:
+    """Any 16-bit PCM WAV -> 16 kHz mono float32 (what Whisper wants)."""
     with wave.open(str(path), "rb") as w:
-        data = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2")
-    return data.astype(np.float32) / 32767
+        rate, channels, width = w.getframerate(), w.getnchannels(), w.getsampwidth()
+        raw = w.readframes(w.getnframes())
+    if width != 2:
+        raise ValueError(f"{path.name}: only 16-bit WAV is supported")
+    data = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32767
+    if channels > 1:
+        data = data.reshape(-1, channels).mean(axis=1)
+    if rate != RATE and len(data):
+        n = int(len(data) * RATE / rate)
+        data = np.interp(np.linspace(0, len(data) - 1, n), np.arange(len(data)), data).astype(np.float32)
+    return data
 
 
 class Source:

@@ -52,13 +52,14 @@ class Settings:
     save_notes: bool = True
     course_context: str = ""  # e.g. "Birkbeck BSc Computer Science, Year 2"
     max_image_edge: int = 1568
-    # Lecture / meeting notetaker
+    # Lecture / meeting notetaker (see moodleclicky/lecture)
     hotkey_notes: str = "<ctrl>+<alt>+n"  # open the notetaker panel
     hotkey_mark: str = "<ctrl>+<alt>+m"  # flag "this bit matters" while recording
     record_mic: bool = True
     record_system: bool = True  # computer audio (Teams/Zoom/Panopto)
     whisper_model: str = "small.en"  # local speech-to-text: tiny.en | base.en | small.en | medium.en
     your_name: str = ""  # so group-meeting notes can pull out YOUR tasks
+    start_with_windows: bool = False
     extra: dict = field(default_factory=dict)
 
     @classmethod

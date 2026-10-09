@@ -2,22 +2,19 @@
 
 from __future__ import annotations
 
+import re
 import tkinter as tk
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from moodleclicky import theme as t
 from moodleclicky.brain import Explanation
 from moodleclicky.capture import monitor_bounds
 from moodleclicky.config import MODES
 
-BG = "#fffbe0"
-EDGE = "#3a3a3a"
-INK = "#1d1d1d"
-MUTED = "#6b6b6b"
-FONT = ("Segoe UI", 11)
-BOLD = ("Segoe UI", 12, "bold")
-MONO = ("Consolas", 10)
-WIDTH = 400
+MODE_NAMES = {"breakdown": "Breakdown", "hint": "Hint", "check": "Check"}
+
+WIDTH = 410
 
 
 @dataclass
@@ -84,62 +81,73 @@ class Bubble:
         w = self.win = tk.Toplevel(root)
         w.overrideredirect(True)
         w.attributes("-topmost", True)
-        w.config(bg=EDGE)
-        inner = self.inner = tk.Frame(w, bg=BG, padx=12, pady=10)
-        inner.pack(padx=2, pady=2, fill="both", expand=True)
+        w.config(bg=t.BORDER)
+        t.style_ttk(w)
+        f = self.f = t.fonts(w)
+        inner = self.inner = tk.Frame(w, bg=t.CARD, padx=16, pady=14)
+        inner.pack(padx=1, pady=1, fill="both", expand=True)
 
-        head = tk.Frame(inner, bg=BG)
+        # header: accent dot · title · ⚙ ✕  (drag to move)
+        head = tk.Frame(inner, bg=t.CARD)
         head.pack(fill="x")
-        self.title = tk.Label(head, text="MoodleClicky", bg=BG, fg=INK, font=BOLD, anchor="w",
-                              wraplength=WIDTH - 80, justify="left")
+        self.dot = tk.Canvas(head, width=10, height=10, bg=t.CARD, highlightthickness=0)
+        self.dot.create_oval(1, 1, 9, 9, fill=t.ACCENT, outline="")
+        self.dot.pack(side="left", padx=(0, 8), pady=(6, 0), anchor="n")
+        self.title = tk.Label(head, text="MoodleClicky", bg=t.CARD, fg=t.INK, font=f.title, anchor="w",
+                              wraplength=WIDTH - 110, justify="left")
         self.title.pack(side="left", fill="x", expand=True)
-        for txt, cmd in (("✕", self.close), ("⚙", self.on_settings)):
-            b = tk.Label(head, text=txt, bg=BG, fg=MUTED, font=("Segoe UI", 12), cursor="hand2", padx=4)
-            b.pack(side="right")
-            b.bind("<Button-1>", lambda _e, c=cmd: c())
+        t.PillButton(head, "✕", self.close, kind="icon", tooltip="Close (Esc)").pack(side="right")
+        t.PillButton(head, "⚙", self.on_settings, kind="icon", tooltip="Settings").pack(side="right", padx=(0, 2))
         for wdg in (head, self.title):
             wdg.bind("<ButtonPress-1>", self._drag_start)
             wdg.bind("<B1-Motion>", self._drag_move)
 
-        modes = tk.Frame(inner, bg=BG)
-        modes.pack(fill="x", pady=(6, 4))
-        self.mode_btns = {}
-        for m in MODES:
-            b = tk.Label(modes, text=m.capitalize(), font=("Segoe UI", 9), padx=8, pady=2, cursor="hand2")
-            b.pack(side="left", padx=(0, 4))
-            b.bind("<Button-1>", lambda _e, mm=m: self._pick_mode(mm))
-            self.mode_btns[m] = b
+        self.mode_var = tk.StringVar(w, get_mode())
+        self.modes = t.Segmented(inner, [(m, MODE_NAMES[m]) for m in MODES], variable=self.mode_var,
+                                 command=self._pick_mode, height=28, width=270)
+        self.modes.pack(anchor="w", pady=(12, 10))
 
-        self.heading = tk.Label(inner, text="", bg=BG, fg=MUTED, font=("Segoe UI", 9, "bold"), anchor="w")
-        self.heading.pack(fill="x", pady=(4, 0))
-        self.body = tk.Text(inner, width=46, height=4, wrap="word", bg=BG, fg=INK, font=FONT,
-                            relief="flat", borderwidth=0, highlightthickness=0, cursor="arrow")
-        self.body.tag_configure("code", font=MONO, background="#f1ecc8", lmargin1=6, lmargin2=6, rmargin=6)
-        self.body.pack(fill="both", expand=True, pady=(2, 6))
+        # "STEP 2 OF 5" + progress dots
+        hrow = tk.Frame(inner, bg=t.CARD)
+        hrow.pack(fill="x")
+        self.heading = tk.Label(hrow, text="", bg=t.CARD, fg=t.ACCENT_HI, font=f.tiny_bold, anchor="w")
+        self.heading.pack(side="left")
+        self.progress = tk.Canvas(hrow, height=8, width=120, bg=t.CARD, highlightthickness=0)
+        self.progress.pack(side="right")
 
-        nav = self.nav = tk.Frame(inner, bg=BG)
+        # The text sits in a fixed-pixel box so the pop-up hugs its content exactly.
+        self.body_box = tk.Frame(inner, bg=t.CARD, width=WIDTH - 34, height=60)
+        self.body_box.pack_propagate(False)
+        self.body = tk.Text(self.body_box, width=44, height=4, wrap="word", cursor="arrow")
+        t.style_text(self.body, bg=t.CARD)
+        self.body.pack(fill="both", expand=True)
+        self.body_box.pack(fill="x", pady=(6, 10))
+
+        nav = self.nav = tk.Frame(inner, bg=t.CARD)
         nav.pack(fill="x")
-        self.back_btn = tk.Button(nav, text="◀ Back", command=self.back, relief="groove", bg=BG)
-        self.next_btn = tk.Button(nav, text="Next ▶", command=self.next, relief="groove", bg=BG)
-        self.answer_btn = tk.Button(nav, text="Show answer", command=self.jump_answer, relief="groove", bg=BG)
+        self.back_btn = t.PillButton(nav, "←  Back", self.back, kind="ghost")
+        self.next_btn = t.PillButton(nav, "Next  →", self.next, kind="primary")
+        self.answer_btn = t.PillButton(nav, "Show answer", self.jump_answer, kind="secondary")
         self.back_btn.pack(side="left")
-        self.next_btn.pack(side="left", padx=4)
+        self.next_btn.pack(side="left", padx=6)
         self.answer_btn.pack(side="right")
 
-        ask = tk.Frame(inner, bg=BG)
-        ask.pack(fill="x", pady=(8, 0))
-        self.entry = tk.Entry(ask, font=FONT, relief="solid", borderwidth=1)
-        self.entry.pack(side="left", fill="x", expand=True, ipady=3)
+        ask = self.ask_row = tk.Frame(inner, bg=t.CARD)
+        ask.pack(fill="x", pady=(12, 0))
+        self.field = t.Field(ask, placeholder="Ask a follow-up…", width=30)
+        self.field.pack(side="left", fill="x", expand=True)
+        self.entry = self.field.entry
         self.entry.bind("<Return>", lambda _e: self._submit())
         self.entry.bind("<Escape>", lambda _e: self.close())
-        self.ask_btn = tk.Button(ask, text="Ask", command=self._submit, relief="groove", bg=BG)
-        self.ask_btn.pack(side="left", padx=(4, 0))
+        self.ask_btn = t.PillButton(ask, "Ask", self._submit, kind="primary", height=34)
+        self.ask_btn.pack(side="left", padx=(8, 0))
 
-        self.footer = tk.Label(inner, text="", bg=BG, fg=MUTED, font=("Segoe UI", 8), anchor="w")
-        self.footer.pack(fill="x", pady=(6, 0))
+        self.footer = tk.Label(inner, text="", bg=t.CARD, fg=t.SUBTLE, font=f.tiny, anchor="w")
+        self.footer.pack(fill="x", pady=(10, 0))
         self.win.bind("<Left>", lambda _e: self.back())
         self.win.bind("<Right>", lambda _e: self.next())
         self.win.withdraw()
+        t.round_corners(self.win)
 
     # ---- states --------------------------------------------------------
     def prompt(self, near: tuple[int, int]) -> None:
@@ -148,10 +156,13 @@ class Bubble:
         self.pages = []
         self.title.config(text="What are you stuck on?")
         self.heading.config(text="")
-        self._set_body("Type a question, or just press Enter and I'll look at what's under your cursor.")
+        self._draw_progress()
+        self._set_body("Type a question - or just press **Enter** and I'll look at what's under your cursor.")
         self.nav.pack_forget()
         self.entry.delete(0, "end")
-        self.footer.config(text="Esc to close  ·  Enter to ask")
+        self.field.set_placeholder("e.g. why is this O(n²)?")
+        self.ask_btn.config(text="Look")
+        self.footer.config(text="Enter  ask   ·   Esc  close")
         self._refresh_modes()
         self._place(near)
         self._show(focus=True)
@@ -160,7 +171,8 @@ class Bubble:
         self.state = "thinking"
         self.title.config(text="Looking at your screen…")
         self.heading.config(text="")
-        self._set_body("Hang on, working it out.")
+        self._draw_progress()
+        self._set_body("Hang on - working it out.")
         self.nav.pack_forget()
         if near:
             self._place(near)
@@ -172,9 +184,11 @@ class Bubble:
         self.title.config(text=exp.title)
         self.footer.config(text=footer)
         self.entry.delete(0, "end")
+        self.field.set_placeholder("Ask a follow-up…")
+        self.ask_btn.config(text="Ask")
         has_answer = any(p.kind == "answer" for p in self.pages)
         if not self.nav.winfo_ismapped():
-            self.nav.pack(fill="x", before=self.entry.master)
+            self.nav.pack(fill="x", before=self.ask_row)
         if has_answer:
             self.answer_btn.pack(side="right")
         else:
@@ -212,10 +226,16 @@ class Bubble:
     # ---- internals -----------------------------------------------------
     def _render(self, near: tuple[int, int] | None = None) -> None:
         page = self.pages[self.idx]
-        self.heading.config(text=page.heading.upper())
+        self.heading.config(text=page.heading.upper(),
+                            fg=t.SUCCESS if page.kind == "answer" else (t.VIOLET if page.kind in ("why", "check")
+                                                                       else t.ACCENT_HI))
         self._set_body(page.text)
+        self._draw_progress()
         self.back_btn.config(state="normal" if self.idx > 0 else "disabled")
-        self.next_btn.config(state="normal" if self.idx < len(self.pages) - 1 else "disabled")
+        last = self.idx >= len(self.pages) - 1
+        self.next_btn.config(state="disabled" if last else "normal")
+        on_answer = page.kind == "answer"
+        self.answer_btn.config(state="disabled" if on_answer else "normal")
         self.on_page(page)
         if page.point:
             self._place(page.point, beside=True)
@@ -224,15 +244,58 @@ class Bubble:
         elif self._anchor:
             self._place(*self._anchor)  # re-clamp: the page may have grown
 
+    def _draw_progress(self) -> None:
+        c = self.progress
+        c.delete("all")
+        n = len(self.pages)
+        if n < 2:
+            return
+        gap, dot, wide = 5, 6, 16
+        x = 120 - (n - 1) * (dot + gap) - wide
+        for i in range(n):
+            if i == self.idx:
+                t.round_rect(c, x, 1, x + wide, 1 + dot, 3, fill=t.ACCENT, outline="")
+                x += wide + gap
+            else:
+                c.create_oval(x, 1, x + dot, 1 + dot, fill=t.SURFACE_HI if i > self.idx else t.ACCENT_LO,
+                              outline="")
+                x += dot + gap
+
     def _set_body(self, text: str) -> None:
         b = self.body
         b.config(state="normal")
         b.delete("1.0", "end")
         for chunk, code in split_code(text):
-            b.insert("end", chunk + "\n", ("code",) if code else ())
+            if code:
+                b.insert("end", "\n", ("codepad",))
+                b.insert("end", chunk + "\n", ("code",))
+                b.insert("end", "\n", ("codepad",))
+            else:
+                self._inline(chunk + "\n")
+        b.delete("end-1c", "end")
         b.config(state="disabled")
-        lines = sum(max(1, len(line) // 44 + 1) for line in text.splitlines()) or 1
-        b.config(height=min(18, max(3, lines)))
+        # Size the box to the wrapped text (pixel height / line height), capped so it never fills the screen.
+        b.update_idletasks()
+        line = t.measure_line(b)
+        if b.winfo_width() <= 1:  # never shown yet: Tk would wrap at 1px, so estimate from characters
+            px = (sum(max(1, -(-len(ln) // 44)) for ln in text.splitlines()) or 1) * (line + 5)
+        else:
+            try:
+                px = b.count("1.0", "end", "update", "ypixels")  # "update" = lay out every line first
+                px = px[0] if isinstance(px, tuple) else px
+            except tk.TclError:
+                px = 3 * line
+        self.body_box.config(height=int(min(18 * line, max(2 * line, (px or line) + 4))))
+
+    def _inline(self, text: str) -> None:
+        """`code` and **bold** inside normal text."""
+        for i, part in enumerate(re.split(r"(`[^`\n]+`|\*\*[^*\n]+\*\*)", text)):
+            if i % 2 and part.startswith("`"):
+                self.body.insert("end", part[1:-1], ("icode",))
+            elif i % 2:
+                self.body.insert("end", part[2:-2], ("b",))
+            else:
+                self.body.insert("end", part)
 
     def _submit(self) -> None:
         text = self.entry.get().strip()
@@ -244,13 +307,11 @@ class Bubble:
 
     def _pick_mode(self, mode: str) -> None:
         self.set_mode(mode)
-        self._refresh_modes()
 
     def _refresh_modes(self) -> None:
         cur = self.get_mode()
-        for m, b in self.mode_btns.items():
-            on = m == cur
-            b.config(bg="#2f80ed" if on else "#ece6c0", fg="white" if on else INK)
+        if self.mode_var.get() != cur:
+            self.mode_var.set(cur)
 
     def _show(self, focus: bool = False) -> None:
         self._refresh_modes()

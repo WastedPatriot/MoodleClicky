@@ -89,6 +89,12 @@ def fonts(root: tk.Misc) -> SimpleNamespace:
     return _fonts
 
 
+def measure_line(text: tk.Text) -> int:
+    """Pixel height of one line of body text in a Text widget (for auto-sizing)."""
+    fobj = tkfont.Font(root=text, font=text.cget("font"))
+    return fobj.metrics("linespace")  # Text `height` is measured in plain font lines
+
+
 def measure(root: tk.Misc, font, text: str) -> int:
     return _font_obj(root, font).measure(text)
 
@@ -430,8 +436,8 @@ class Segmented(tk.Canvas):
         self._value = variable.get() if variable else (self._opts[0][0] if self._opts else "")
         self._hover: int | None = None
         natural = sum(measure(parent, self._font, lbl) + 28 for _, lbl in self._opts) + 6
-        self._w = max(width or 0, natural)
-        super().__init__(parent, width=self._w, height=height, bg=self._bg, highlightthickness=0, bd=0,
+        self._seg_w = max(width or 0, natural)
+        super().__init__(parent, width=self._seg_w, height=height, bg=self._bg, highlightthickness=0, bd=0,
                          cursor="hand2", takefocus=0)
         self.bind("<Motion>", self._motion)
         self.bind("<Leave>", lambda _e: self._hover_to(None))
@@ -442,13 +448,13 @@ class Segmented(tk.Canvas):
         self._draw()
 
     def _resize(self, w: int) -> None:
-        if w > 1 and w != self._w:
-            self._w = w
+        if w > 1 and w != self._seg_w:
+            self._seg_w = w
             self._draw()
 
     def _seg_bounds(self) -> list[tuple[float, float]]:
         n = max(1, len(self._opts))
-        inner = self._w - 6
+        inner = self._seg_w - 6
         return [(3 + inner * i / n, 3 + inner * (i + 1) / n) for i in range(n)]
 
     def _index_at(self, x: float) -> int | None:
@@ -487,7 +493,7 @@ class Segmented(tk.Canvas):
 
     def _draw(self) -> None:
         self.delete("all")
-        w, h = int(self._w), self._h
+        w, h = int(self._seg_w), self._h
         draw_pill(self, 0, 0, w, h, h // 2, SURFACE, self._bg)
         for i, ((val, lbl), (a, b)) in enumerate(zip(self._opts, self._seg_bounds(), strict=False)):
             on = val == self._value

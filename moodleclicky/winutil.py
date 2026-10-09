@@ -52,3 +52,78 @@ def com_init() -> None:
         ctypes.windll.ole32.CoInitializeEx(None, 0)  # COINIT_MULTITHREADED
     except Exception:  # nosec B110 - already initialised in this thread
         pass
+
+
+# ---- start with Windows ------------------------------------------------------
+_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+
+
+def launch_command() -> str:
+    """How to start this app: the .exe when frozen, otherwise pythonw -m moodleclicky."""
+    import os
+
+    if getattr(sys, "frozen", False):
+        return f'"{sys.executable}"'
+    exe = sys.executable
+    pyw = os.path.join(os.path.dirname(exe), "pythonw.exe")
+    return f'"{pyw if os.path.exists(pyw) else exe}" -m moodleclicky'
+
+
+def set_autostart(enabled: bool, name: str = "MoodleClicky") -> bool:
+    if not IS_WIN:
+        return False
+    import winreg
+
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
+            if enabled:
+                winreg.SetValueEx(key, name, 0, winreg.REG_SZ, launch_command())
+            else:
+                try:
+                    winreg.DeleteValue(key, name)
+                except FileNotFoundError:
+                    pass
+        return True
+    except OSError:
+        return False
+
+
+# ---- single instance ---------------------------------------------------------
+_PORT = 48713  # localhost only
+
+
+class SingleInstance:
+    """Only one MoodleClicky at a time. A second launch pokes the first one (which shows itself) and exits."""
+
+    def __init__(self, on_poke=None):
+        import socket
+        import threading
+
+        self.primary = False
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            if not IS_WIN:
+                self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self._sock.bind(("127.0.0.1", _PORT))
+            self._sock.listen(1)
+            self.primary = True
+        except OSError:
+            self._sock.close()
+            try:
+                with socket.create_connection(("127.0.0.1", _PORT), timeout=1) as c:
+                    c.sendall(b"show")
+            except OSError:
+                self.primary = True  # port taken by something else: just run
+            return
+
+        def serve():
+            while True:
+                try:
+                    conn, _ = self._sock.accept()
+                    with conn:
+                        if conn.recv(16) == b"show" and on_poke:
+                            on_poke()
+                except OSError:
+                    return
+
+        threading.Thread(target=serve, name="single-instance", daemon=True).start()

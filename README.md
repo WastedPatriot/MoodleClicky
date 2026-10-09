@@ -140,7 +140,7 @@ xvfb-run -a -s "-screen 0 1600x900x24" python tests/ui_smoke.py   # drives the r
 xvfb-run -a -s "-screen 0 1600x900x24" python tools/make_docs.py  # regenerates the screenshots + GIF
 ```
 
-Build the Windows app yourself: `tools\build_exe.bat`. It runs PyInstaller, then self-tests the built `.exe`, and writes the output to `dist\MoodleClicky-windows.zip`. CI does the same on every push. Tag `v*` to publish a Release.
+Build the Windows app yourself: `tools\build_exe.bat`. It runs PyInstaller, then self-tests the built `.exe`, and writes the output to `dist\MoodleClicky-windows.zip`. CI does the same on every push, and every green build on `main` publishes the Release that the install command downloads.
 
 **Troubleshooting:** everything is logged to `%APPDATA%\MoodleClicky\moodleclicky.log`. Run `MoodleClicky.exe --selftest report.txt` to check an install.
 

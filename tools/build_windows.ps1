@@ -14,8 +14,7 @@ pyinstaller --noconfirm --clean --windowed --onedir --name MoodleClicky `
   --icon build\moodleclicky.ico `
   --collect-all faster_whisper --collect-all ctranslate2 --collect-all onnxruntime --collect-all tokenizers `
   --collect-data soundcard --collect-submodules pystray --collect-submodules pynput `
-  --hidden-import keyring.backends.Windows `
-  --exclude-module av `
+  --hidden-import keyring.backends.Windows --collect-binaries av `
   moodleclicky\__main__.py
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 

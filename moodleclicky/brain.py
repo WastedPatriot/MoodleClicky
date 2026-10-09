@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -39,6 +40,15 @@ How you help:
 - Keep the student's own words, code style and language. Code snippets short; no essays.
 - If nothing study-related is visible, say so kindly in summary and give no steps.
 
+Typing help ("type_text"):
+- If the student is clearly writing in a text box / editor at or near the cursor (an answer box, an essay
+  line, a code line, a form field), put the exact text that should go in at their caret in "type_text":
+  the answer for a fill-in box, the rest of the sentence or line they're on, or the next line(s) of code.
+  Plain text only - no quotes, no markdown fences, no explanation; match their language, style and
+  indentation; never repeat what they've already typed. They press a key and it's pasted for them.
+- In hint mode, type_text is only a sentence starter or skeleton, never the full answer.
+- Otherwise "type_text" is "".
+
 Modes:
 - breakdown: give the final answer in "answer", and the steps that get there.
 - hint: do NOT give the final answer ("answer" must be ""). Steps are nudges, from gentlest to strongest.
@@ -51,6 +61,7 @@ SCHEMA = {
     "properties": {
         "title": {"type": "string", "description": "3-8 word label, e.g. 'Q4 - Big-O of nested loops'"},
         "summary": {"type": "string", "description": "One line: what the question is really asking"},
+        "type_text": {"type": "string", "description": "Text to paste at the student's caret, or ''"},
         "steps": {
             "type": "array",
             "items": {
@@ -69,7 +80,7 @@ SCHEMA = {
         "why": {"type": "string"},
         "check_yourself": {"type": "string"},
     },
-    "required": ["title", "summary", "steps", "answer", "why", "check_yourself"],
+    "required": ["title", "summary", "type_text", "steps", "answer", "why", "check_yourself"],
     "additionalProperties": False,
 }
 
@@ -89,6 +100,7 @@ class Explanation:
     answer: str = ""
     why: str = ""
     check_yourself: str = ""
+    type_text: str = ""
     cost_usd: float = 0.0
     error: str = ""
 
@@ -110,7 +122,24 @@ def parse_explanation(text: str, shot: Shot | None) -> Explanation:
         answer=data.get("answer", "").strip(),
         why=data.get("why", "").strip(),
         check_yourself=data.get("check_yourself", "").strip(),
+        type_text=(data.get("type_text") or "").strip("\n"),
     )
+
+
+_PARTIAL_KEYS = ("title", "summary", "type_text")
+
+
+def partial_fields(text: str) -> dict:
+    """Pull the finished string fields out of a JSON reply that's still streaming in."""
+    out = {}
+    for key in _PARTIAL_KEYS:
+        m = re.search('"' + key + r'"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
+        if m:
+            try:
+                out[key] = json.loads(f'"{m.group(1)}"')
+            except ValueError:
+                pass
+    return out
 
 
 def estimate_cost(model: str, usage) -> float:
@@ -139,7 +168,8 @@ def json_example(schema: dict) -> str:
 
 
 # ---- backends ---------------------------------------------------------------
-# History is kept provider-neutral: {"role": "user"|"assistant", "text": str, "png": bytes|None, "raw": any}.
+# History is kept provider-neutral: {"role": "user"|"assistant", "text": str, "image": bytes|None,
+# "media_type": str, "raw": any}.
 # Each backend turns it into its own wire format and returns a Reply.
 
 
@@ -176,17 +206,18 @@ class ClaudeBackend:
         for turn in history:
             if turn["role"] == "assistant":
                 out.append({"role": "assistant", "content": turn.get("raw") or turn["text"]})
-            elif turn.get("png"):
-                b64 = base64.standard_b64encode(turn["png"]).decode("ascii")
+            elif turn.get("image"):
+                b64 = base64.standard_b64encode(turn["image"]).decode("ascii")
+                mt = turn.get("media_type", "image/jpeg")
                 out.append({"role": "user", "content": [
-                    {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}},
+                    {"type": "image", "source": {"type": "base64", "media_type": mt, "data": b64}},
                     {"type": "text", "text": turn["text"]},
                 ]})
             else:
                 out.append({"role": "user", "content": turn["text"]})
         return out
 
-    def chat(self, settings: Settings, system: str, history: list[dict], schema: dict) -> Reply:
+    def chat(self, settings: Settings, system: str, history: list[dict], schema: dict, on_text=None) -> Reply:
         import anthropic
 
         try:
@@ -200,6 +231,11 @@ class ClaudeBackend:
                 betas=["server-side-fallback-2026-07-01"],
                 fallbacks="default",
             ) as stream:
+                if on_text is not None and hasattr(stream, "text_stream"):
+                    buf = ""
+                    for chunk in stream.text_stream:  # show title/summary while the rest is written
+                        buf += chunk
+                        on_text(buf)
                 msg = stream.get_final_message()
         except anthropic.AuthenticationError as e:
             raise APIProblem("Your Claude API key was rejected. Open Settings and paste a new one.") from e
@@ -247,17 +283,18 @@ class DeepSeekBackend:
         for turn in history:
             if turn["role"] == "assistant":
                 out.append({"role": "assistant", "content": turn["text"]})
-            elif turn.get("png"):
-                b64 = base64.standard_b64encode(turn["png"]).decode("ascii")
+            elif turn.get("image"):
+                b64 = base64.standard_b64encode(turn["image"]).decode("ascii")
+                mt = turn.get("media_type", "image/jpeg")
                 out.append({"role": "user", "content": [
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}", "detail": "high"}},
+                    {"type": "image_url", "image_url": {"url": f"data:{mt};base64,{b64}", "detail": "high"}},
                     {"type": "text", "text": turn["text"]},
                 ]})
             else:
                 out.append({"role": "user", "content": turn["text"]})
         return out
 
-    def chat(self, settings: Settings, system: str, history: list[dict], schema: dict) -> Reply:
+    def chat(self, settings: Settings, system: str, history: list[dict], schema: dict, on_text=None) -> Reply:
         system = (
             f"{system}\n\nReply with a single json object only (no markdown fences) with exactly these keys, "
             f"following this JSON schema:\n{json.dumps(schema)}\nExample shape:\n{json_example(schema)}"
@@ -339,29 +376,40 @@ class Tutor:
             line += f" Course context: {self.settings.course_context}."
         return line
 
-    def ask(self, shot: Shot, question: str, mode: str) -> Explanation:
+    def ask(self, shot: Shot, question: str, mode: str, on_partial=None) -> Explanation:
         self.shot = shot
         self._backend = None if self._backend and self._backend.name != self.settings.provider else self._backend
         ask = question.strip() or "I'm stuck on the thing at my cursor. Help me understand it."
         self.history = [{
             "role": "user",
-            "png": shot.png,
+            "image": shot.image,
+            "media_type": shot.media_type,
             "text": (
                 f"Screenshot is {shot.width}x{shot.height}px. Cursor ring at {shot.cursor}.\n"
                 f"{self._mode_line(mode)}\n\nStudent: {ask}"
             ),
         }]
-        return self._run()
+        return self._run(on_partial)
 
-    def follow_up(self, text: str, mode: str) -> Explanation:
+    def follow_up(self, text: str, mode: str, on_partial=None) -> Explanation:
         if not self.history:
             return Explanation.failed("Press the hotkey first so I can see your screen.")
         self.history.append({"role": "user", "text": f"{self._mode_line(mode)}\n\nStudent: {text.strip()}"})
-        return self._run()
+        return self._run(on_partial)
 
-    def _run(self) -> Explanation:
+    def _run(self, on_partial=None) -> Explanation:
+        seen: dict = {}
+
+        def on_text(buf: str) -> None:
+            got = partial_fields(buf)
+            if got and got != seen:
+                seen.clear()
+                seen.update(got)
+                on_partial(dict(got))
+
         try:
-            reply = self.backend.chat(self.settings, SYSTEM, self.history, SCHEMA)
+            reply = self.backend.chat(self.settings, SYSTEM, self.history, SCHEMA,
+                                      on_text=on_text if on_partial else None)
         except APIProblem as e:
             self.history.pop()  # let them retry the same question
             return Explanation.failed(str(e))

@@ -127,3 +127,27 @@ class SingleInstance:
                     return
 
         threading.Thread(target=serve, name="single-instance", daemon=True).start()
+
+
+# ---- whose window has the keyboard ---------------------------------------------
+def foreground_window() -> int | None:
+    """Handle of the window you were typing in (so we can give focus back / type into it)."""
+    if not IS_WIN:
+        return None
+    import ctypes
+
+    try:
+        return int(ctypes.windll.user32.GetForegroundWindow()) or None
+    except Exception:
+        return None
+
+
+def focus_window(hwnd: int | None) -> bool:
+    if not (IS_WIN and hwnd):
+        return False
+    import ctypes
+
+    try:
+        return bool(ctypes.windll.user32.SetForegroundWindow(hwnd))
+    except Exception:
+        return False

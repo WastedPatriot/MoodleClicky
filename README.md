@@ -1,6 +1,6 @@
 # MoodleClicky
 
-**A study buddy that lives next to your mouse cursor.** Stuck on a Moodle question, a coursework task or an error in your code? Press a hotkey. MoodleClicky looks at your screen, flies over to the right spot, and walks you through it one small step at a time in a Clippy-style pop-up. No chatbot wall of text.
+**A study buddy that lives next to your mouse cursor.** Stuck on a Moodle question, a coursework task or an error in your code? **Double-tap Ctrl.** MoodleClicky looks at your screen, flies over to the right spot, and walks you through it one small step at a time in a Clippy-style pop-up. No chatbot wall of text, and no pressing Enter. If you're typing in a box, it suggests what goes there. **Double-tap Ctrl again** and it types it in for you.
 
 ![MoodleClicky demo](docs/demo.gif)
 
@@ -38,16 +38,35 @@ If you'd turned on *Start with Windows*, the new install takes that over automat
 Install **Python 3.11+** from [python.org](https://www.python.org/downloads/) (tick *"Add python.exe to PATH"*). Download this repo, then double-click **`run.bat`**. The first run sets everything up.
 </details>
 
-## Hotkeys
+## Keys
 
 | Keys | What it does |
 |---|---|
-| **Ctrl + Alt + Space** | "What are you stuck on?" Type a question, or just press Enter and it looks at what's under your cursor |
+| **Ctrl, Ctrl** (double-tap) | Look at what's under your mouse **right now** and explain it |
+| **Ctrl, Ctrl** again | Type the ✍ suggestion into the box you were typing in (Ctrl+Z undoes it) |
+| **Ctrl + Alt + Space** | Type a question first ("why is this O(n²)?") |
 | **Ctrl + Alt + H** | Show or hide the cursor buddy |
 | **Ctrl + Alt + N** | Open the lecture / meeting notetaker |
 | **Ctrl + Alt + M** | ⭐ Mark "this bit matters" while recording (highlighted in your notes) |
 | **← / →** | Previous / next step in the pop-up |
 | **Esc** | Close the pop-up |
+
+**Why double-tap Ctrl?** Tapping Ctrl on its own does nothing in browsers, Word or code editors, so it never gets in the way. Ctrl+C, Ctrl+V, Ctrl+click and holding Ctrl don't count. Prefer something else? Settings → **Wake-up key**: Right Ctrl, or the classic Ctrl+Alt+Space.
+
+The pop-up doesn't steal your keyboard. Your cursor stays in the box you were typing in, so you can keep going.
+
+### ✍ Typing help
+
+When you call the buddy while you're writing in a box (a Moodle answer, a forum post, an essay, a line of code), the pop-up shows a **Type this** card. Depending on what you're doing, that's:
+- the answer for the box
+- the rest of your sentence
+- the next line(s) of code
+
+Double-tap Ctrl again, or click **Type it**, and it's pasted at your cursor. Your clipboard is put back afterwards. In **Hint** mode it only gives you a starter, never the full answer.
+
+### ⚡ Speed
+
+Replies stream in: the title and summary appear as soon as they're written, and the rest follows. Settings → **Speed vs depth** picks **Fast** (the default, a few seconds), Balanced or Thorough.
 
 You can change all of these in Settings (⚙ in the pop-up, or right-click the tray icon).
 
@@ -119,6 +138,8 @@ hotkey ─► hide own windows ─► screenshot the monitor under the cursor (c
 | File | Job |
 |---|---|
 | `moodleclicky/app.py` | Wiring: hotkeys (pynput), tray icon (pystray), worker threads |
+| `moodleclicky/triggers.py` | Double-tap Ctrl / Right Ctrl wake-up key (ignores Ctrl+C etc.) |
+| `moodleclicky/typer.py` | Types a suggestion into the box you were in (refocus, paste, restore clipboard) |
 | `moodleclicky/brain.py` | Prompt, JSON schema, Claude and DeepSeek backends, cost estimate |
 | `moodleclicky/capture.py` | Screenshot of the right monitor; maps the AI's coordinates back to the screen |
 | `moodleclicky/buddy.py` | The cursor buddy (follows you, flies to targets, thinking dots) |

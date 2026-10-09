@@ -171,6 +171,13 @@ function Show-SetupMenu {
     $name = Ask "Your first name (so group-meeting notes can find YOUR tasks)" $(if ($cur) { $cur.your_name } else { "" })
     $course = Ask "Your course (optional, e.g. Birkbeck BSc Computer Science Y2)" $(if ($cur) { $cur.course_context } else { "" })
     Say ""
+    $triggers = @("double_ctrl", "right_ctrl", "hotkey")
+    $tIdx = if ($cur -and ($triggers -contains $cur.trigger)) { [array]::IndexOf($triggers, $cur.trigger) } else { 0 }
+    $tr = AskChoice "How do you want to call the buddy? (press it again to type a suggestion into your box)" @("Double-tap Ctrl  - recommended, never clashes with anything", "Tap Right Ctrl on its own", "Ctrl + Alt + Space") $tIdx
+    $efforts = @("low", "medium", "high")
+    $eIdx = if ($cur -and ($efforts -contains $cur.effort) -and $cur.config_version -ge 2) { [array]::IndexOf($efforts, $cur.effort) } else { 0 }
+    $ef = AskChoice "Speed vs depth" @("Fast     - answers in a few seconds (recommended)", "Balanced", "Thorough - thinks longer for hard problems") $eIdx
+    Say ""
     $auto = AskYesNo "Start MoodleClicky when Windows starts?" $(if ($cur) { [bool]$cur.start_with_windows } else { $true })
     Say ""
     Say "  Lecture / meeting notetaker" White
@@ -183,6 +190,7 @@ function Show-SetupMenu {
     $payload = [ordered]@{
         provider = $provider; your_name = $name; course_context = $course; start_with_windows = $auto
         record_mic = $mic; record_system = $sys; whisper_model = $models[$m]; buddy_visible = $true
+        trigger = $triggers[$tr]; effort = $efforts[$ef]; instant = $true
     }
     if ($key) { $payload.api_key = $key }
 
@@ -207,7 +215,14 @@ function Start-AppNow {
     Say ""
     Say "  It lives in your system tray (bottom-right, by the clock)." White
     Say ""
-    Say "    Ctrl + Alt + Space   ask about what's under your mouse"
+    $now = Read-CurrentSettings
+    $wake = switch ($(if ($now) { $now.trigger } else { "" })) {
+        "right_ctrl" { "Right Ctrl          " }
+        "hotkey" { "Ctrl + Alt + Space  " }
+        default { "Double-tap Ctrl     " }
+    }
+    Say "    $wake look at what's under your mouse (again = type the suggestion)"
+    Say "    Ctrl + Alt + Space   type a question first"
     Say "    Ctrl + Alt + N       lecture / meeting notetaker"
     Say "    Ctrl + Alt + M       mark an important moment while recording"
     Say "    Ctrl + Alt + H       show / hide the buddy"

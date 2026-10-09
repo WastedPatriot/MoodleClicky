@@ -17,7 +17,8 @@ from moodleclicky.bubble import Bubble, Page
 from moodleclicky.buddy import Buddy
 from moodleclicky.config import Settings, data_dir
 from moodleclicky.settings_ui import SettingsWindow
-from moodleclicky.winutil import SingleInstance, enable_dpi_awareness, set_autostart
+from moodleclicky.triggers import KeyTrigger
+from moodleclicky.winutil import SingleInstance, enable_dpi_awareness, focus_window, foreground_window, set_autostart
 
 log = logging.getLogger(APP_NAME)
 
@@ -36,6 +37,9 @@ class App:
         self._tray = None
         self._settings_win: SettingsWindow | None = None
         self._notetaker = None
+        self._trigger: KeyTrigger | None = None
+        self.target_hwnd: int | None = None  # the window you were typing in when you called the buddy
+        self._return_focus = False  # quick-trigger looks hand the keyboard straight back to your box
 
         self.buddy = Buddy(root, settings.buddy_color)
         self.bubble = Bubble(
@@ -47,11 +51,14 @@ class App:
             on_close=self.buddy.follow,
             get_mode=lambda: self.mode,
             set_mode=self._set_mode,
+            on_type=self.type_suggestion,
+            type_hint=trigger_hint(settings),
         )
         if not settings.buddy_visible:
             self.buddy.hide()
         if enable_hotkeys:
             self._start_hotkeys()
+            self._start_trigger()
         if enable_tray:
             self._start_tray()
         self._pump()
@@ -69,6 +76,44 @@ class App:
         self.root.after(40, self._pump)
 
     # ---- actions -------------------------------------------------------
+    def on_trigger(self) -> None:
+        """Double-tap Ctrl (or your chosen trigger): type the suggestion if one is up, else look now."""
+        if self.bubble.state == "showing" and self.bubble.type_text:
+            self.type_suggestion()
+        elif self.settings.instant:
+            self.look_now()
+        else:
+            self.start_prompt()
+
+    def look_now(self) -> None:
+        """No questions asked: screenshot what's under the mouse and explain it."""
+        if self.busy:
+            return
+        if not self.tutor.ready:
+            self.open_settings()
+            return
+        self.target_hwnd = foreground_window()
+        self._return_focus = True
+        self.ask("")
+
+    def type_suggestion(self) -> None:
+        text = self.bubble.type_text
+        if not text:
+            return
+        from moodleclicky.typer import type_into
+
+        try:
+            type_into(self.root, self.target_hwnd, text, pause=self._pause_trigger)
+            self.bubble.footer.config(text="✓ Typed into your box. Ctrl+Z undoes it.")
+            self.bubble.set_type_text("")
+        except Exception as e:  # keyboard hook unavailable etc.
+            log.exception("typing failed")
+            self.bubble.footer.config(text=f"Couldn't type it ({e}) - it's on your clipboard instead.")
+
+    def _pause_trigger(self, on: bool) -> None:
+        if self._trigger:
+            self._trigger.tap.paused = on
+
     def start_prompt(self) -> None:
         """Hotkey: pop up next to the cursor and ask what's up."""
         if self.busy:
@@ -79,6 +124,8 @@ class App:
         if not self.buddy.visible and self.settings.buddy_visible:
             self.buddy.show()
         self.buddy.follow()
+        self.target_hwnd = foreground_window()
+        self._return_focus = False  # the prompt needs the keyboard
         self.bubble.prompt(self.root.winfo_pointerxy())
 
     def ask(self, question: str) -> None:
@@ -88,9 +135,11 @@ class App:
         self.last_question = question
         cursor = self.root.winfo_pointerxy()
         # Hide our own windows so they aren't in the screenshot.
+        was_visible = self.bubble.state != "hidden" or self.buddy.visible
         self.bubble.win.withdraw()
         self.buddy.win.withdraw()
         self.root.update()
+        partial = lambda f: self.call_soon(lambda: self.bubble.show_partial(f))  # noqa: E731
 
         def work() -> None:
             try:
@@ -100,21 +149,25 @@ class App:
                 self.call_soon(lambda: self._show_result(failed, cursor))
                 return
             self.call_soon(lambda: self._thinking(cursor))
-            exp = self.tutor.ask(shot, question, self.mode)
+            exp = self.tutor.ask(shot, question, self.mode, on_partial=partial)
             self.call_soon(lambda: self._show_result(exp, cursor))
 
-        self.root.after(120, lambda: threading.Thread(target=work, daemon=True).start())
+        # Give Windows a moment to actually remove our windows from the screen before the screenshot.
+        self.root.after(60 if was_visible else 0, lambda: threading.Thread(target=work, daemon=True).start())
 
     def follow_up(self, text: str) -> None:
         if self.busy:
             return
         self.busy = True
         self.last_question = text
+        self._return_focus = False
         near = self.buddy.position()
         self._thinking(None)
 
+        partial = lambda f: self.call_soon(lambda: self.bubble.show_partial(f))  # noqa: E731
+
         def work() -> None:
-            exp = self.tutor.follow_up(text, self.mode)
+            exp = self.tutor.follow_up(text, self.mode, on_partial=partial)
             self.call_soon(lambda: self._show_result(exp, near))
 
         threading.Thread(target=work, daemon=True).start()
@@ -161,6 +214,8 @@ class App:
             nt.session.stop()  # saves the last chunk; transcript so far is already on disk
         if self._hotkeys:
             self._hotkeys.stop()
+        if self._trigger:
+            self._trigger.stop()
         if self._tray:
             self._tray.stop()
         self.root.quit()
@@ -172,6 +227,12 @@ class App:
         self.buddy.follow()
         self.buddy.set_thinking(True)
         self.bubble.thinking(cursor)
+        self._give_focus_back()
+
+    def _give_focus_back(self) -> None:
+        """Showing the pop-up mustn't steal your caret: return focus to the box you were typing in."""
+        if self._return_focus and self.target_hwnd:
+            self.root.after(30, lambda: focus_window(self.target_hwnd))
 
     def _show_result(self, exp: Explanation, near: tuple[int, int]) -> None:
         self.busy = False
@@ -185,7 +246,10 @@ class App:
                 footer += " · saved to notes"
             except OSError:
                 pass
+        if exp.type_text and not exp.error:
+            footer = f"{trigger_hint(self.settings)} types the suggestion · " + footer
         self.bubble.show_explanation(exp, near, self.settings.open_on_answer, footer)
+        self._give_focus_back()
 
     def _on_page(self, page: Page | None) -> None:
         if page and page.point:
@@ -209,6 +273,10 @@ class App:
         if self._hotkeys:
             self._hotkeys.stop()
             self._start_hotkeys()
+        if self._trigger:
+            self._trigger.stop()
+            self._start_trigger()
+        self.bubble.type_btn.config(text=f"Type it  ·  {trigger_hint(s)}")
         if self._tray:
             self._tray.update_menu()
 
@@ -218,7 +286,8 @@ class App:
 
             s = self.settings
             keys = {}
-            for combo, fn in ((s.hotkey_ask, self.start_prompt), (s.hotkey_toggle, self.toggle_buddy),
+            ask_fn = self.on_trigger if s.trigger == "hotkey" else self.start_prompt
+            for combo, fn in ((s.hotkey_ask, ask_fn), (s.hotkey_toggle, self.toggle_buddy),
                               (s.hotkey_notes, self.open_notetaker), (s.hotkey_mark, self.mark_moment)):
                 if combo and combo not in keys:
                     keys[combo] = lambda fn=fn: self.call_soon(fn)
@@ -228,6 +297,17 @@ class App:
         except Exception:  # bad hotkey string or no keyboard hook available
             log.exception("hotkeys disabled")
             self._hotkeys = None
+
+    def _start_trigger(self) -> None:
+        if self.settings.trigger == "hotkey":
+            self._trigger = None
+            return
+        try:
+            self._trigger = KeyTrigger(self.settings.trigger, lambda: self.call_soon(self.on_trigger))
+            self._trigger.start()
+        except Exception:  # no keyboard hook available
+            log.exception("double-tap trigger disabled")
+            self._trigger = None
 
     def _start_tray(self) -> None:
         try:
@@ -239,7 +319,8 @@ class App:
         menu = pystray.Menu(
             item("Show / hide buddy", lambda: self.call_soon(self.toggle_buddy), default=True,
                  checked=lambda _i: self.settings.buddy_visible),
-            item("Ask about my screen", lambda: self.call_soon(self.start_prompt)),
+            item("Look at my screen now", lambda: self.call_soon(self.look_now)),
+            item("Ask a question…", lambda: self.call_soon(self.start_prompt)),
             item("Lecture / meeting notetaker…", lambda: self.call_soon(self.open_notetaker)),
             item("Settings…", lambda: self.call_soon(self.open_settings)),
             item("Open revision notes", lambda: self.call_soon(self.open_notes)),
@@ -253,6 +334,10 @@ class App:
         except Exception:
             log.exception("tray icon disabled")
             self._tray = None
+
+
+def trigger_hint(s: Settings) -> str:
+    return {"double_ctrl": "Ctrl Ctrl", "right_ctrl": "Right Ctrl"}.get(s.trigger, "Ctrl+Alt+Space")
 
 
 def tray_image(color: str):

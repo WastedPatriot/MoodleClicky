@@ -9,10 +9,11 @@ from __future__ import annotations
 import json
 import os
 
-from moodleclicky.config import PROVIDERS, WHISPER_MODELS, Settings, data_dir, set_api_key
+from moodleclicky.config import EFFORTS, PROVIDERS, WHISPER_MODELS, Settings, data_dir, set_api_key
+from moodleclicky.triggers import TRIGGERS
 
 ENV = "MOODLECLICKY_SETUP"
-BOOL_FIELDS = ("start_with_windows", "record_mic", "record_system", "buddy_visible")
+BOOL_FIELDS = ("start_with_windows", "record_mic", "record_system", "buddy_visible", "instant")
 TEXT_FIELDS = ("your_name", "course_context")
 
 
@@ -37,6 +38,12 @@ def apply_setup(payload: dict, settings: Settings | None = None, store_key=set_a
         if f in payload:
             setattr(s, f, bool(payload[f]))
             done.append(f"{f} = {getattr(s, f)}")
+    if payload.get("trigger") in TRIGGERS:
+        s.trigger = payload["trigger"]
+        done.append(f"trigger = {s.trigger}")
+    if payload.get("effort") in EFFORTS:
+        s.effort = payload["effort"]
+        done.append(f"effort = {s.effort}")
     if payload.get("whisper_model") in WHISPER_MODELS:
         s.whisper_model = payload["whisper_model"]
         done.append(f"whisper_model = {s.whisper_model}")

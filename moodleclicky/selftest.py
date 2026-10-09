@@ -191,7 +191,56 @@ def check_ui(report: list[str]) -> None:
     pump(root, 0.3)
     app._settings_win._save()
     report.append("ok    settings window opens and saves")
+    if sys.platform == "win32":
+        check_keyboard(root, report)
     root.destroy()
+
+
+def check_keyboard(root, report: list[str]) -> None:
+    """Real key events (Windows): double-tap Ctrl wakes the buddy; a suggestion is pasted into a text box."""
+    import tkinter as tk
+
+    from pynput.keyboard import Controller, Key
+
+    from moodleclicky.triggers import KeyTrigger
+    from moodleclicky.typer import type_into
+    from moodleclicky.winutil import foreground_window
+
+    kb = Controller()
+    fired = []
+    trig = KeyTrigger("double_ctrl", lambda: fired.append(1))
+    trig.start()
+    time.sleep(0.5)
+    with kb.pressed(Key.ctrl):  # Ctrl+C must NOT trigger
+        kb.press("c")
+        kb.release("c")
+    time.sleep(0.6)
+    for _ in range(2):
+        kb.press(Key.ctrl)
+        time.sleep(0.05)
+        kb.release(Key.ctrl)
+        time.sleep(0.12)
+    time.sleep(0.4)
+    trig.stop()
+    check(fired == [1], f"double-tap Ctrl fired {len(fired)} times (want 1)")
+    report.append("ok    double-tap Ctrl wakes the buddy (Ctrl+C doesn't)")
+
+    win = tk.Toplevel(root)
+    win.title("MoodleClicky self-test box")
+    entry = tk.Entry(win, width=40)
+    entry.pack(padx=20, pady=20)
+    win.deiconify()
+    win.lift()
+    win.focus_force()
+    entry.focus_set()
+    pump(root, 0.6)
+    hwnd = foreground_window()
+    type_into(root, hwnd, "O(n^2) because the loops nest")
+    pump(root, 1.0)
+    got = entry.get()
+    win.destroy()
+    check(got == "O(n^2) because the loops nest", f"typed text was {got!r}")
+    report.append("ok    suggestion pasted into a real text box")
 
 
 def check_model(report: list[str]) -> None:

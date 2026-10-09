@@ -3,6 +3,7 @@
     xvfb-run -s "-screen 0 1600x900x24" python tests/ui_smoke.py [shot.png]
 """
 
+import json
 import os
 import sys
 import tempfile
@@ -105,6 +106,67 @@ def main(out=None):
     b.close()
     pump(root, 0.1)
     assert b.state == "hidden"
+    # --- quick trigger: look straight away (no prompt, no Enter), then type the suggestion -------------
+    from fakes import SAMPLE
+
+    payload = dict(SAMPLE, type_text="O(n^2)")
+    fake = FakeClient(payload=payload)
+    text = json.dumps(payload)
+    fake.chunks = [text[i:i + 20] for i in range(0, len(text), 20)]
+    app.tutor = Tutor(app.settings, client=fake)
+    app.settings.instant = True
+    partials = []
+    orig_partial = b.show_partial
+    b.show_partial = lambda f: (partials.append(f), orig_partial(f))
+    app.on_trigger()
+    for _ in range(300):
+        pump(root, 0.02)
+        if b.state == "showing" and not app.busy:
+            break
+    assert b.state == "showing", b.state  # never went through the "what are you stuck on?" prompt
+    assert partials and partials[0].get("title"), partials
+    assert b.type_box.winfo_ismapped() and "O(n^2)" in b.type_preview.cget("text")
+    assert "Ctrl Ctrl" in b.footer.cget("text")
+
+    import moodleclicky.typer as typer
+
+    class FakeKeyboard:
+        def __init__(self):
+            self.log = []
+
+        def pressed(self, key):
+            log = self.log
+
+            class Ctx:
+                def __enter__(self):
+                    log.append(("down", str(key)))
+
+                def __exit__(self, *a):
+                    log.append(("up", str(key)))
+
+            return Ctx()
+
+        def press(self, k):
+            self.log.append(("press", k))
+
+        def release(self, k):
+            self.log.append(("release", k))
+
+    kb = FakeKeyboard()
+    real_type_into = typer.type_into
+    typer.type_into = lambda root_, hwnd, txt, pause=lambda on: None: real_type_into(root_, hwnd, txt, pause, kb)
+    root.clipboard_clear()
+    root.clipboard_append("my old clipboard")
+    app.on_trigger()  # second trigger while a suggestion is showing = type it
+    pasted = root.clipboard_get()
+    pump(root, 0.9)
+    typer.type_into = real_type_into
+    assert pasted == "O(n^2)", pasted
+    assert ("press", "v") in kb.log and kb.log[0][0] == "down", kb.log  # Ctrl+V
+    assert root.clipboard_get() == "my old clipboard"  # clipboard put back
+    assert "Typed" in b.footer.cget("text") and not b.type_box.winfo_ismapped()
+    b.close()
+
     root.destroy()
     print("ui_smoke OK")
 

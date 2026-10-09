@@ -171,9 +171,9 @@ function Show-SetupMenu {
     $name = Ask "Your first name (so group-meeting notes can find YOUR tasks)" $(if ($cur) { $cur.your_name } else { "" })
     $course = Ask "Your course (optional, e.g. Birkbeck BSc Computer Science Y2)" $(if ($cur) { $cur.course_context } else { "" })
     Say ""
-    $triggers = @("double_ctrl", "right_ctrl", "hotkey")
+    $triggers = @("double_rctrl", "double_ctrl", "triple_ctrl", "right_ctrl", "hotkey")
     $tIdx = if ($cur -and ($triggers -contains $cur.trigger)) { [array]::IndexOf($triggers, $cur.trigger) } else { 0 }
-    $tr = AskChoice "How do you want to call the buddy? (press it again to type a suggestion into your box)" @("Double-tap Ctrl  - recommended, never clashes with anything", "Tap Right Ctrl on its own", "Ctrl + Alt + Space") $tIdx
+    $tr = AskChoice "How do you want to call the buddy? (press it again to type a suggestion into your box)" @("Double-tap RIGHT Ctrl - recommended, clashes with nothing", "Double-tap either Ctrl (clashes with PowerToys Find My Mouse)", "Triple-tap either Ctrl", "Tap Right Ctrl once", "Ctrl + Alt + Space") $tIdx
     $efforts = @("low", "medium", "high")
     $eIdx = if ($cur -and ($efforts -contains $cur.effort) -and $cur.config_version -ge 2) { [array]::IndexOf($efforts, $cur.effort) } else { 0 }
     $ef = AskChoice "Speed vs depth" @("Fast     - answers in a few seconds (recommended)", "Balanced", "Thorough - thinks longer for hard problems") $eIdx
@@ -218,8 +218,10 @@ function Start-AppNow {
     $now = Read-CurrentSettings
     $wake = switch ($(if ($now) { $now.trigger } else { "" })) {
         "right_ctrl" { "Right Ctrl          " }
+        "double_ctrl" { "Double-tap Ctrl     " }
+        "triple_ctrl" { "Triple-tap Ctrl     " }
         "hotkey" { "Ctrl + Alt + Space  " }
-        default { "Double-tap Ctrl     " }
+        default { "Right Ctrl, Right Ctrl" }
     }
     Say "    $wake look at what's under your mouse (again = type the suggestion)"
     Say "    Ctrl + Alt + Space   type a question first"

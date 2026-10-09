@@ -53,7 +53,7 @@ jobs:
           }
           Get-Content (Join-Path $env:APPDATA "MoodleClicky\setup.log")
           $cfg = Get-Content (Join-Path $env:APPDATA "MoodleClicky\config.json") -Raw | ConvertFrom-Json
-          if ($cfg.your_name -ne "CI" -or $cfg.whisper_model -ne "tiny.en" -or $cfg.trigger -ne "double_ctrl" -or $cfg.effort -ne "low") { throw "setup answers not saved" }
+          if ($cfg.your_name -ne "CI" -or $cfg.whisper_model -ne "tiny.en" -or $cfg.trigger -ne "double_rctrl" -or $cfg.effort -ne "low") { throw "setup answers not saved" }
           Start-Sleep -Seconds 8
           if (-not (Get-Process MoodleClicky -ErrorAction SilentlyContinue)) {
             Get-Content (Join-Path $env:APPDATA "MoodleClicky\moodleclicky.log") -ErrorAction SilentlyContinue

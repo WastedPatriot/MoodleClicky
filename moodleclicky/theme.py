@@ -328,6 +328,7 @@ class PillButton(tk.Canvas):
                  kind: str = "secondary", font=None, height: int | None = None, width: int | None = None,
                  padx: int = 14, radius: int | None = None, bg: str | None = None, tooltip: str = ""):
         self._bg = bg or _bg_of(parent)
+        self._measure_on = parent  # measure text via the parent: this canvas doesn't exist yet in __init__
         self._kind = kind
         self._text = text
         self._command = command
@@ -349,7 +350,7 @@ class PillButton(tk.Canvas):
     def _width(self) -> int:
         if self._fixed_w:
             return self._fixed_w
-        return measure(self, self._font, self._text) + 2 * self._padx
+        return measure(self._measure_on, self._font, self._text) + 2 * self._padx
 
     def _set(self, hover: bool | None = None, down: bool | None = None) -> None:
         if hover is not None:
@@ -648,7 +649,8 @@ def form_row(parent: tk.Misc, label: str, widget_factory: Callable[[tk.Frame], t
     w = widget_factory(row)
     w.pack(fill="x")
     if hint:
-        tk.Label(row, text=hint, bg=bg, fg=SUBTLE, font=f.tiny, anchor="w", justify="left").pack(fill="x",
+        tk.Label(row, text=hint, bg=bg, fg=SUBTLE, font=f.tiny, anchor="w", justify="left",
+                 wraplength=440).pack(fill="x",
                                                                                               pady=(3, 0))
     return w
 

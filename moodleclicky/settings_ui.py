@@ -17,7 +17,7 @@ from moodleclicky.config import (
     get_api_key,
     set_api_key,
 )
-from moodleclicky.triggers import TRIGGERS
+from moodleclicky.triggers import TRIGGER_LABELS, TRIGGERS
 
 KEY_HINTS = {
     "anthropic": "Get one at console.anthropic.com → API keys (starts with sk-ant-).",
@@ -85,12 +85,12 @@ class SettingsWindow:
         # -- General
         g = t.Card(body, "General", "How the buddy behaves.")
         g.pack(fill="x", pady=(0, 10))
-        self.trigger = tk.StringVar(w, s.trigger)
-        t.form_row(g.body, "Wake-up key", lambda p: t.Segmented(
-            p, [("double_ctrl", "Double-tap Ctrl"), ("right_ctrl", "Right Ctrl"), ("hotkey", "Ctrl+Alt+Space")],
-            variable=self.trigger),
-            hint="Tapping Ctrl on its own does nothing in browsers or Word, so it never gets in the way. "
-                 "Ctrl+C / Ctrl+V don't count. Press it again to type a suggestion into your box.")
+        self.trigger = tk.StringVar(w, TRIGGER_LABELS.get(s.trigger, TRIGGER_LABELS["double_rctrl"]))
+        t.form_row(g.body, "Wake-up key", lambda p: t.combobox(
+            p, self.trigger, [TRIGGER_LABELS[k] for k in TRIGGERS], readonly=True),
+            hint="Tapping Ctrl on its own does nothing in browsers or Word, and Ctrl+C / Ctrl+V don't count. "
+                 "Press it again to type a suggestion into your box. Right Ctrl avoids PowerToys' Find My Mouse "
+                 "(Left Ctrl ×2).")
         self.instant = tk.BooleanVar(w, s.instant)
         t.Toggle(g.body, self.instant, "Look straight away", "Off = ask \"what are you stuck on?\" first").pack(
             fill="x", pady=(0, 10))
@@ -162,7 +162,7 @@ class SettingsWindow:
     def _save(self) -> None:
         s = self.settings
         s.buddy_visible = self.visible.get()
-        s.trigger = self.trigger.get() if self.trigger.get() in TRIGGERS else "double_ctrl"
+        s.trigger = {v: k for k, v in TRIGGER_LABELS.items()}.get(self.trigger.get(), "double_rctrl")
         s.instant = self.instant.get()
         label_to_mode = {v: k for k, v in MODE_LABELS.items()}
         s.mode = label_to_mode.get(self.mode.get(), "breakdown")

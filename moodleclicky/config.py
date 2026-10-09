@@ -44,7 +44,7 @@ class Settings:
     deepseek_model: str = "deepseek-flash"  # must be a vision-capable DeepSeek model
     effort: str = "low"  # low = fastest replies; medium/high think longer
     mode: str = "breakdown"
-    trigger: str = "double_ctrl"  # double_ctrl | right_ctrl | hotkey  (see triggers.py)
+    trigger: str = "double_rctrl"  # double_rctrl | double_ctrl | right_ctrl | hotkey  (see triggers.py)
     instant: bool = True  # look straight away; False = ask "what are you stuck on?" first
     hotkey_ask: str = "<ctrl>+<alt>+<space>"  # always opens the type-a-question prompt
     hotkey_toggle: str = "<ctrl>+<alt>+h"
@@ -82,8 +82,8 @@ class Settings:
             s.mode = "breakdown"
         if s.effort not in EFFORTS:
             s.effort = "low"
-        if s.trigger not in ("double_ctrl", "right_ctrl", "hotkey"):
-            s.trigger = "double_ctrl"
+        if s.trigger not in ("double_rctrl", "double_ctrl", "triple_ctrl", "right_ctrl", "hotkey"):
+            s.trigger = "double_rctrl"
         if s.provider not in PROVIDERS:
             s.provider = "anthropic"
         if s.whisper_model not in WHISPER_MODELS:

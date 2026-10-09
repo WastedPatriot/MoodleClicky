@@ -208,22 +208,26 @@ def check_keyboard(root, report: list[str]) -> None:
 
     kb = Controller()
     fired = []
-    trig = KeyTrigger("double_ctrl", lambda: fired.append(1))
+    trig = KeyTrigger("double_rctrl", lambda: fired.append(1))
     trig.start()
     time.sleep(0.5)
-    with kb.pressed(Key.ctrl):  # Ctrl+C must NOT trigger
+    def double_tap(key):
+        for _ in range(2):
+            kb.press(key)
+            time.sleep(0.05)
+            kb.release(key)
+            time.sleep(0.12)
+        time.sleep(0.6)
+
+    with kb.pressed(Key.ctrl_r):  # Right Ctrl+C must NOT trigger
         kb.press("c")
         kb.release("c")
     time.sleep(0.6)
-    for _ in range(2):
-        kb.press(Key.ctrl)
-        time.sleep(0.05)
-        kb.release(Key.ctrl)
-        time.sleep(0.12)
-    time.sleep(0.4)
+    double_tap(Key.ctrl_l)  # Left Ctrl x2 is PowerToys Find My Mouse - must NOT trigger
+    double_tap(Key.ctrl_r)  # Right Ctrl x2 = wake up
     trig.stop()
-    check(fired == [1], f"double-tap Ctrl fired {len(fired)} times (want 1)")
-    report.append("ok    double-tap Ctrl wakes the buddy (Ctrl+C doesn't)")
+    check(fired == [1], f"double-tap Right Ctrl fired {len(fired)} times (want 1)")
+    report.append("ok    double-tap Right Ctrl wakes the buddy (Left Ctrl x2 and Ctrl+C don't)")
 
     win = tk.Toplevel(root)
     win.title("MoodleClicky self-test box")

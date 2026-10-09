@@ -18,7 +18,7 @@ the Clippy-style bubble pages through summary → steps → answer → why → c
 - `brain.py` backends: ClaudeBackend (anthropic SDK) + DeepSeekBackend (stdlib HTTP, deepseek-flash vision + JSON
   mode); history is provider-neutral dicts
 - `lecture/` notetaker: audio.py (soundcard mic+loopback, wall-clock mixer, 30 s WAV chunks), transcribe.py
-  (faster-whisper, we decode WAV ourselves - no PyAV), session.py (crash-safe session.json/transcript.md),
+  (faster-whisper; we decode WAV ourselves, but faster_whisper still imports PyAV so the build must include it), session.py (crash-safe session.json/transcript.md),
   summarise.py (lecture/meeting/catch-up schemas); `lecture_ui.py` panel; `theme.py` shared dark widgets
 - `selftest.py`: `python -m moodleclicky --selftest [report] [--with-model]` - offline end-to-end check (CI runs it
   against the built exe)

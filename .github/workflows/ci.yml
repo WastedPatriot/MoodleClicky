@@ -45,7 +45,7 @@ jobs:
       - name: Installer test (install from the built zip, setup menu, launch, uninstall)
         shell: pwsh
         run: |
-          "1`nsk-ant-ci-not-a-real-key`nCI`nTest course`nn`ny`ny`n1`n" | pwsh -NoProfile -File install.ps1 -Zip dist/MoodleClicky-windows.zip
+          "1`nsk-ant-ci-not-a-real-key`nCI`nTest course`n1`n1`nn`ny`ny`n1`n" | pwsh -NoProfile -File install.ps1 -Zip dist/MoodleClicky-windows.zip
           $dir = Join-Path $env:LOCALAPPDATA "Programs\MoodleClicky"
           if (-not (Test-Path "$dir\MoodleClicky.exe")) { throw "exe not installed" }
           foreach ($l in "MoodleClicky.lnk", "MoodleClicky Setup.lnk", "Uninstall MoodleClicky.lnk") {
@@ -53,7 +53,7 @@ jobs:
           }
           Get-Content (Join-Path $env:APPDATA "MoodleClicky\setup.log")
           $cfg = Get-Content (Join-Path $env:APPDATA "MoodleClicky\config.json") -Raw | ConvertFrom-Json
-          if ($cfg.your_name -ne "CI" -or $cfg.whisper_model -ne "tiny.en") { throw "setup answers not saved" }
+          if ($cfg.your_name -ne "CI" -or $cfg.whisper_model -ne "tiny.en" -or $cfg.trigger -ne "double_ctrl" -or $cfg.effort -ne "low") { throw "setup answers not saved" }
           Start-Sleep -Seconds 8
           if (-not (Get-Process MoodleClicky -ErrorAction SilentlyContinue)) {
             Get-Content (Join-Path $env:APPDATA "MoodleClicky\moodleclicky.log") -ErrorAction SilentlyContinue

@@ -42,9 +42,11 @@ class Settings:
     provider: str = "anthropic"  # anthropic | deepseek
     model: str = "claude-opus-5-5"  # Claude model
     deepseek_model: str = "deepseek-flash"  # must be a vision-capable DeepSeek model
-    effort: str = "medium"
+    effort: str = "low"  # low = fastest replies; medium/high think longer
     mode: str = "breakdown"
-    hotkey_ask: str = "<ctrl>+<alt>+<space>"
+    trigger: str = "double_ctrl"  # double_ctrl | right_ctrl | hotkey  (see triggers.py)
+    instant: bool = True  # look straight away; False = ask "what are you stuck on?" first
+    hotkey_ask: str = "<ctrl>+<alt>+<space>"  # always opens the type-a-question prompt
     hotkey_toggle: str = "<ctrl>+<alt>+h"
     buddy_visible: bool = True
     buddy_color: str = "#2f80ed"
@@ -60,6 +62,7 @@ class Settings:
     whisper_model: str = "small.en"  # local speech-to-text: tiny.en | base.en | small.en | medium.en
     your_name: str = ""  # so group-meeting notes can pull out YOUR tasks
     start_with_windows: bool = False
+    config_version: int = 2
     extra: dict = field(default_factory=dict)
 
     @classmethod
@@ -71,10 +74,16 @@ class Settings:
             return cls()
         known = {f.name for f in fields(cls)}
         s = cls(**{k: v for k, v in raw.items() if k in known})
+        if raw.get("config_version", 1) < 2:  # v0.2 saved "medium" by default; v0.3 defaults to fast replies
+            if raw.get("effort", "medium") == "medium":
+                s.effort = "low"
+            s.config_version = 2
         if s.mode not in MODES:
             s.mode = "breakdown"
         if s.effort not in EFFORTS:
-            s.effort = "medium"
+            s.effort = "low"
+        if s.trigger not in ("double_ctrl", "right_ctrl", "hotkey"):
+            s.trigger = "double_ctrl"
         if s.provider not in PROVIDERS:
             s.provider = "anthropic"
         if s.whisper_model not in WHISPER_MODELS:

@@ -10,13 +10,15 @@ from PIL import Image, ImageDraw
 
 @dataclass
 class Shot:
-    png: bytes
+    image: bytes  # JPEG (fast to encode, small to upload)
     width: int  # image size sent to Claude
     height: int
     left: int  # monitor origin on the virtual desktop
     top: int
     scale: float  # image px per screen px
     cursor: tuple[int, int]  # cursor position in image px
+
+    media_type: str = "image/jpeg"
 
     def to_screen(self, x: float, y: float) -> tuple[int, int] | None:
         """Image coordinates from Claude -> real screen coordinates. None if off-image."""
@@ -44,7 +46,7 @@ def build_shot(img: Image.Image, left: int, top: int, cursor_xy: tuple[int, int]
     r = max(10, round(18 * scale))
     draw.ellipse((cx - r, cy - r, cx + r, cy + r), outline=(255, 0, 90), width=3)
     buf = io.BytesIO()
-    img.save(buf, format="PNG", optimize=True)
+    img.save(buf, format="JPEG", quality=85)  # ~10x faster than optimised PNG and a fraction of the size
     return Shot(buf.getvalue(), img.width, img.height, left, top, scale, (cx, cy))
 
 

@@ -20,8 +20,10 @@ SAMPLE = {
 
 
 class FakeStream:
-    def __init__(self, msg):
+    def __init__(self, msg, chunks=None):
         self.msg = msg
+        if chunks is not None:
+            self.text_stream = iter(chunks)
 
     def __enter__(self):
         return self
@@ -37,6 +39,7 @@ class FakeClient:
     def __init__(self, payload=None, stop_reason="end_turn"):
         self.payload = SAMPLE if payload is None else payload
         self.stop_reason = stop_reason
+        self.chunks = None  # set to a list of text pieces to simulate streaming
         self.calls = []
         self.beta = SimpleNamespace(messages=SimpleNamespace(stream=self._stream))
 
@@ -49,4 +52,4 @@ class FakeClient:
             usage=SimpleNamespace(input_tokens=2000, output_tokens=500,
                                   cache_creation_input_tokens=0, cache_read_input_tokens=0),
         )
-        return FakeStream(msg)
+        return FakeStream(msg, self.chunks)

@@ -30,7 +30,7 @@ def test_shot_scales_and_maps_back():
     assert shot.to_screen(200, 150) == (2320, 300)  # back on the second monitor
     assert shot.to_screen(-1, -1) is None
     assert shot.to_screen(5000, 10) is None
-    assert shot.png[:8] == b"\x89PNG\r\n\x1a\n"
+    assert shot.image[:3] == b"\xff\xd8\xff" and shot.media_type == "image/jpeg"
 
 
 def test_small_screens_are_not_upscaled():
@@ -66,7 +66,7 @@ def test_tutor_ask_and_follow_up_keep_history():
     call = fake.calls[0]
     assert call["model"] == "claude-opus-5-5"
     assert call["output_config"]["format"]["type"] == "json_schema"
-    assert call["output_config"]["effort"] == "medium"
+    assert call["output_config"]["effort"] == "low"
     assert call["fallbacks"] == "default"
     content = call["messages"][0]["content"]
     assert content[0]["type"] == "image" and "Mode: hint." in content[1]["text"]
@@ -106,7 +106,11 @@ def test_settings_roundtrip_and_bad_values(tmp_path):
     assert Settings.load(p).course_context == "Birkbeck CS"
     p.write_text('{"mode": "nonsense", "effort": "ultra", "unknown_key": 1}')
     s2 = Settings.load(p)
-    assert s2.mode == "breakdown" and s2.effort == "medium"
+    assert s2.mode == "breakdown" and s2.effort == "low"
+    p.write_text('{"effort": "medium"}')  # a v0.2 config: old default upgraded to the faster one
+    assert Settings.load(p).effort == "low"
+    p.write_text('{"effort": "medium", "config_version": 2}')  # chosen on purpose: kept
+    assert Settings.load(p).effort == "medium"
     p.write_text("{broken")
     assert Settings.load(p).mode == "breakdown"
 
@@ -153,7 +157,7 @@ def test_deepseek_backend_wire_format():
     assert p["reasoning_effort"] == "high"
     assert p["messages"][0]["role"] == "system" and "json" in p["messages"][0]["content"]
     user = p["messages"][1]["content"]
-    assert user[0]["type"] == "image_url" and user[0]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert user[0]["type"] == "image_url" and user[0]["image_url"]["url"].startswith("data:image/jpeg;base64,")
     assert abs(exp.cost_usd - 0.0015) < 1e-9
 
     t.follow_up("and why?", "hint")
@@ -213,3 +217,107 @@ def test_apply_setup_from_installer(tmp_path):
     assert s.provider == "deepseek" and s.your_name == "Dom" and not s.record_mic and s.whisper_model == "base.en"
     assert any("1234" in x for x in lines) and not any("sk-test" in x for x in lines)  # key never logged
     assert Settings.load().your_name == "Dom"  # persisted
+
+
+class Clock:
+    def __init__(self):
+        self.t = 100.0
+
+    def __call__(self):
+        return self.t
+
+
+def tap(d, clock, hold=0.08, gap=0.1):
+    d.watched_down()
+    clock.t += hold
+    d.watched_up()
+    clock.t += gap
+
+
+def test_double_tap_ctrl_rules():
+    from moodleclicky.triggers import DoubleTap
+
+    fired = []
+    clock = Clock()
+    d = DoubleTap(lambda: fired.append(clock.t), clock=clock)
+    tap(d, clock)
+    assert fired == []  # one tap: nothing
+    tap(d, clock)
+    assert len(fired) == 1  # clean double tap
+
+    tap(d, clock, gap=1.0)  # too slow between taps
+    tap(d, clock)
+    assert len(fired) == 1
+    tap(d, clock)  # ...but that second tap starts a fresh pair
+    assert len(fired) == 2
+
+    # Ctrl+C then Ctrl+V: Ctrl is used with other keys -> never a trigger
+    for _ in range(2):
+        d.watched_down()
+        d.other_key()
+        clock.t += 0.05
+        d.watched_up()
+    assert len(fired) == 2
+
+    # holding Ctrl (e.g. Ctrl+scroll) doesn't count as a tap
+    tap(d, clock, hold=0.8)
+    tap(d, clock)
+    assert len(fired) == 2
+
+    clock.t += 5  # start the next scenario fresh
+
+    # typing a letter between taps cancels
+    tap(d, clock)
+    d.other_key()
+    tap(d, clock)
+    assert len(fired) == 2
+
+    clock.t += 5
+
+    # auto-repeat key-down events while held are ignored
+    d.watched_down()
+    d.watched_down()
+    clock.t += 0.05
+    d.watched_up()
+    tap(d, clock)
+    assert len(fired) == 3
+
+    # paused while we type into another app ourselves
+    d.paused = True
+    tap(d, clock)
+    tap(d, clock)
+    assert len(fired) == 3
+
+
+def test_single_tap_mode():
+    from moodleclicky.triggers import DoubleTap
+
+    fired = []
+    clock = Clock()
+    d = DoubleTap(lambda: fired.append(1), taps=1, clock=clock)
+    tap(d, clock)
+    assert fired == [1]
+
+
+def test_partial_fields_while_streaming():
+    from moodleclicky.brain import partial_fields
+
+    assert partial_fields('{"title": "Q3 \\"big\\" O", "summary": "How it gr') == {"title": 'Q3 "big" O'}
+    full = '{"title": "A", "summary": "B", "type_text": "for i in range(n):\\n    x", "st'
+    assert partial_fields(full) == {"title": "A", "summary": "B", "type_text": "for i in range(n):\n    x"}
+    assert partial_fields("") == {}
+
+
+def test_streaming_partials_and_type_text():
+    from fakes import SAMPLE as S
+
+    payload = dict(S, type_text="O(n^2)")
+    fake = FakeClient(payload=payload)
+    text = json.dumps(payload)
+    fake.chunks = [text[i:i + 15] for i in range(0, len(text), 15)]
+    seen = []
+    exp = Tutor(Settings(), client=fake).ask(make_shot(), "", "breakdown", on_partial=seen.append)
+    assert exp.type_text == "O(n^2)"
+    assert seen and seen[0] == {"title": S["title"]}  # title arrives first, before the rest
+    assert seen[-1]["type_text"] == "O(n^2)"
+    assert len(seen) == len({json.dumps(x, sort_keys=True) for x in seen})  # only sent when something changed

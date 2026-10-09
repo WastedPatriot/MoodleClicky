@@ -67,8 +67,12 @@ class Bubble:
         on_close: Callable[[], None],
         get_mode: Callable[[], str],
         set_mode: Callable[[str], None],
+        on_type: Callable[[], None] | None = None,
+        type_hint: str = "Ctrl Ctrl",
     ):
         self.root = root
+        self.on_type = on_type or (lambda: None)
+        self.type_text = ""
         self.on_ask, self.on_follow_up = on_ask, on_follow_up
         self.on_settings, self.on_page, self.on_close = on_settings, on_page, on_close
         self.get_mode, self.set_mode = get_mode, set_mode
@@ -107,8 +111,20 @@ class Bubble:
                                  command=self._pick_mode, height=28, width=270)
         self.modes.pack(anchor="w", pady=(12, 10))
 
+        # "✍ Type this" card: text the buddy can paste into the box you were typing in
+        tb = self.type_box = tk.Frame(inner, bg=t.CODE_BG, padx=12, pady=9)
+        trow = tk.Frame(tb, bg=t.CODE_BG)
+        trow.pack(fill="x")
+        tk.Label(trow, text="✍  TYPE THIS", bg=t.CODE_BG, fg=t.SUCCESS, font=f.tiny_bold).pack(side="left")
+        self.type_btn = t.PillButton(trow, f"Type it  ·  {type_hint}", lambda: self.on_type(), kind="primary",
+                                     height=26, bg=t.CODE_BG)
+        self.type_btn.pack(side="right")
+        self.type_preview = tk.Label(tb, text="", bg=t.CODE_BG, fg=t.CODE_INK, font=f.mono, anchor="w",
+                                     justify="left", wraplength=WIDTH - 60)
+        self.type_preview.pack(fill="x", pady=(6, 0))
+
         # "STEP 2 OF 5" + progress dots
-        hrow = tk.Frame(inner, bg=t.CARD)
+        hrow = self.hrow = tk.Frame(inner, bg=t.CARD)
         hrow.pack(fill="x")
         self.heading = tk.Label(hrow, text="", bg=t.CARD, fg=t.ACCENT_HI, font=f.tiny_bold, anchor="w")
         self.heading.pack(side="left")
@@ -154,6 +170,7 @@ class Bubble:
         """Hotkey pressed: ask what they're stuck on (Enter with nothing = 'just look')."""
         self.state = "prompt"
         self.pages = []
+        self.set_type_text("")
         self.title.config(text="What are you stuck on?")
         self.heading.config(text="")
         self._draw_progress()
@@ -167,8 +184,33 @@ class Bubble:
         self._place(near)
         self._show(focus=True)
 
+    def set_type_text(self, text: str) -> None:
+        self.type_text = text or ""
+        if not self.type_text:
+            self.type_box.pack_forget()
+            return
+        lines = self.type_text.splitlines() or [""]
+        preview = "\n".join(lines[:6]) + ("\n…" if len(lines) > 6 else "")
+        self.type_preview.config(text=preview)
+        if not self.type_box.winfo_ismapped():
+            self.type_box.pack(fill="x", pady=(0, 10), before=self.hrow)
+
+    def show_partial(self, fields: dict) -> None:
+        """Streaming: show the title/summary/typing suggestion as soon as each one is finished."""
+        if self.state != "thinking":
+            return
+        if fields.get("title"):
+            self.title.config(text=fields["title"])
+        if fields.get("summary"):
+            self._set_body(fields["summary"] + "\n\nWorking out the steps…")
+        if fields.get("type_text"):
+            self.set_type_text(fields["type_text"])
+        if self._anchor:
+            self._place(*self._anchor)
+
     def thinking(self, near: tuple[int, int] | None = None) -> None:
         self.state = "thinking"
+        self.set_type_text("")
         self.title.config(text="Looking at your screen…")
         self.heading.config(text="")
         self._draw_progress()
@@ -182,6 +224,7 @@ class Bubble:
         self.state = "showing"
         self.pages = build_pages(exp)
         self.title.config(text=exp.title)
+        self.set_type_text(exp.type_text)
         self.footer.config(text=footer)
         self.entry.delete(0, "end")
         self.field.set_placeholder("Ask a follow-up…")

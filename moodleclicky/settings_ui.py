@@ -17,6 +17,7 @@ from moodleclicky.config import (
     get_api_key,
     set_api_key,
 )
+from moodleclicky.triggers import TRIGGERS
 
 KEY_HINTS = {
     "anthropic": "Get one at console.anthropic.com → API keys (starts with sk-ant-).",
@@ -76,14 +77,23 @@ class SettingsWindow:
                        hint=f"Default: {DEFAULT_MODELS[p]}")
             self.provider_frames[p] = fr
         self.effort = tk.StringVar(w, s.effort)
-        self.effort_row = t.form_row(a.body, "Thinking effort", lambda p: t.Segmented(
-            p, [(e, e.capitalize()) for e in EFFORTS], variable=self.effort),
-            hint="Higher = more careful, slower, a bit pricier.", pady=(4, 0))
+        self.effort_row = t.form_row(a.body, "Speed vs depth", lambda p: t.Segmented(
+            p, [("low", "Fast"), ("medium", "Balanced"), ("high", "Thorough")], variable=self.effort),
+            hint="Fast replies in a few seconds. Thorough thinks longer for hard problems.", pady=(4, 0))
         self._show_provider()
 
         # -- General
         g = t.Card(body, "General", "How the buddy behaves.")
         g.pack(fill="x", pady=(0, 10))
+        self.trigger = tk.StringVar(w, s.trigger)
+        t.form_row(g.body, "Wake-up key", lambda p: t.Segmented(
+            p, [("double_ctrl", "Double-tap Ctrl"), ("right_ctrl", "Right Ctrl"), ("hotkey", "Ctrl+Alt+Space")],
+            variable=self.trigger),
+            hint="Tapping Ctrl on its own does nothing in browsers or Word, so it never gets in the way. "
+                 "Ctrl+C / Ctrl+V don't count. Press it again to type a suggestion into your box.")
+        self.instant = tk.BooleanVar(w, s.instant)
+        t.Toggle(g.body, self.instant, "Look straight away", "Off = ask \"what are you stuck on?\" first").pack(
+            fill="x", pady=(0, 10))
         self.visible = tk.BooleanVar(w, s.buddy_visible)
         t.Toggle(g.body, self.visible, "Show the cursor buddy", "Ctrl+Alt+H or the tray icon also toggles it").pack(
             fill="x", pady=(0, 10))
@@ -152,12 +162,14 @@ class SettingsWindow:
     def _save(self) -> None:
         s = self.settings
         s.buddy_visible = self.visible.get()
+        s.trigger = self.trigger.get() if self.trigger.get() in TRIGGERS else "double_ctrl"
+        s.instant = self.instant.get()
         label_to_mode = {v: k for k, v in MODE_LABELS.items()}
         s.mode = label_to_mode.get(self.mode.get(), "breakdown")
         s.provider = self.provider.get() if self.provider.get() in ("anthropic", "deepseek") else "anthropic"
         s.model = self.models["anthropic"].get().strip() or DEFAULT_MODELS["anthropic"]
         s.deepseek_model = self.models["deepseek"].get().strip() or DEFAULT_MODELS["deepseek"]
-        s.effort = self.effort.get() if self.effort.get() in EFFORTS else "medium"
+        s.effort = self.effort.get() if self.effort.get() in EFFORTS else "low"
         s.course_context = self.course.get().strip()
         for key, var in self.hk.items():
             setattr(s, key, var.get().strip() or getattr(s, key))

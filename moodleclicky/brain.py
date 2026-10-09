@@ -270,6 +270,21 @@ class DeepSeekHTTP:
             return json.loads(resp.read().decode("utf-8"))
 
 
+# DeepSeek models that can actually see images (others silently drop them and answer "unsupported").
+DEEPSEEK_VISION = ("deepseek-flash", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp")
+_BLIND = ("can't see", "cannot see", "can not see", "unable to see", "not able to see", "unable to view",
+          "can't view", "cannot view", "unsupported", "no image", "no screenshot", "image is not",
+          "screenshot is not", "didn't come through", "did not come through", "upload the image",
+          "not visible to me")
+
+
+def looks_blind(reply_text: str) -> bool:
+    """True if the AI's title/summary says it never saw the screenshot."""
+    head = " ".join(partial_fields(reply_text).get(k, "") for k in ("title", "summary")).lower()
+    head = head.replace("\u2019", "'")
+    return any(p in head for p in _BLIND)
+
+
 class DeepSeekBackend:
     name = "deepseek"
     EFFORT = {"low": "low", "medium": "high", "high": "max"}
@@ -278,7 +293,7 @@ class DeepSeekBackend:
         self._client = client or DeepSeekHTTP(api_key)
 
     @staticmethod
-    def to_messages(system: str, history: list[dict]) -> list[dict]:
+    def to_messages(system: str, history: list[dict], image_style: str = "image_url") -> list[dict]:
         out = [{"role": "system", "content": system}]
         for turn in history:
             if turn["role"] == "assistant":
@@ -286,29 +301,19 @@ class DeepSeekBackend:
             elif turn.get("image"):
                 b64 = base64.standard_b64encode(turn["image"]).decode("ascii")
                 mt = turn.get("media_type", "image/jpeg")
-                out.append({"role": "user", "content": [
-                    {"type": "image_url", "image_url": {"url": f"data:{mt};base64,{b64}", "detail": "high"}},
-                    {"type": "text", "text": turn["text"]},
-                ]})
+                url = f"data:{mt};base64,{b64}"
+                if image_style == "file":  # DeepSeek's other documented way to send an inline image
+                    img = {"type": "file", "file_data": url, "filename": "screen." + mt.split("/")[-1]}
+                else:
+                    img = {"type": "image_url", "image_url": {"url": url, "detail": "high"}}
+                out.append({"role": "user", "content": [img, {"type": "text", "text": turn["text"]}]})
             else:
                 out.append({"role": "user", "content": turn["text"]})
         return out
 
-    def chat(self, settings: Settings, system: str, history: list[dict], schema: dict, on_text=None) -> Reply:
-        system = (
-            f"{system}\n\nReply with a single json object only (no markdown fences) with exactly these keys, "
-            f"following this JSON schema:\n{json.dumps(schema)}\nExample shape:\n{json_example(schema)}"
-        )
-        payload = {
-            "model": settings.deepseek_model,
-            "messages": self.to_messages(system, history),
-            "response_format": {"type": "json_object"},
-            "max_tokens": 16000,
-            "thinking": {"type": "enabled"},
-            "reasoning_effort": self.EFFORT.get(settings.effort, "high"),
-        }
+    def _send(self, payload: dict) -> dict:
         try:
-            data = self._client.chat(payload)
+            return self._client.chat(payload)
         except urllib.error.HTTPError as e:
             if e.code == 401:
                 raise APIProblem("Your DeepSeek API key was rejected. Open Settings and paste a new one.") from e
@@ -320,6 +325,40 @@ class DeepSeekBackend:
             raise APIProblem(f"DeepSeek API error {e.code}. {detail}".strip()) from e
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             raise APIProblem("Can't reach the internet / DeepSeek API.") from e
+
+    def chat(self, settings: Settings, system: str, history: list[dict], schema: dict, on_text=None) -> Reply:
+        system = (
+            f"{system}\n\nReply with a single json object only (no markdown fences) with exactly these keys, "
+            f"following this JSON schema:\n{json.dumps(schema)}\nExample shape:\n{json_example(schema)}"
+        )
+        has_image = any(t.get("image") for t in history)
+        model = settings.deepseek_model
+        if has_image and model not in DEEPSEEK_VISION:
+            model = "deepseek-flash"  # e.g. deepseek-v4-pro can't see screenshots at all
+        payload = {
+            "model": model,
+            "messages": self.to_messages(system, history),
+            "response_format": {"type": "json_object"},
+            "max_tokens": 16000,
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": self.EFFORT.get(settings.effort, "high"),
+        }
+        data = self._send(payload)
+        text, stop, cost = self._read(data, model)
+        if has_image and looks_blind(text):
+            # Image didn't get through: retry once with the alternative image block and thinking off.
+            retry = dict(payload, messages=self.to_messages(system, history, image_style="file"),
+                         thinking={"type": "disabled"})
+            retry.pop("reasoning_effort", None)
+            text, stop, cost2 = self._read(self._send(retry), model)
+            cost += cost2
+            if looks_blind(text):
+                raise APIProblem("DeepSeek couldn't read the screenshot. Switch to Claude in Settings "
+                                 "(tray icon -> Settings -> AI provider), or try again in a moment.")
+        return Reply(text, None, cost, stop)
+
+    @staticmethod
+    def _read(data: dict, model: str) -> tuple[str, str, float]:
         try:
             choice = data["choices"][0]
             text = choice["message"].get("content") or ""
@@ -327,9 +366,9 @@ class DeepSeekBackend:
             raise APIProblem("Got an unexpected reply from DeepSeek - try again.") from e
         stop = {"length": "max_tokens", "content_filter": "refusal"}.get(choice.get("finish_reason"), "end")
         usage = data.get("usage") or {}
-        pin, pout = PRICES.get(settings.deepseek_model, PRICES["deepseek-flash"])
+        pin, pout = PRICES.get(model, PRICES["deepseek-flash"])
         cost = ((usage.get("prompt_tokens") or 0) * pin + (usage.get("completion_tokens") or 0) * pout) / 1e6
-        return Reply(text, None, cost, stop)
+        return text, stop, cost
 
 
 def make_backend(settings: Settings, claude_client=None, deepseek_client=None):
@@ -417,6 +456,8 @@ class Tutor:
         self.history.append({"role": "assistant", "text": reply.text, "raw": reply.raw})
         if reply.stop == "refusal":
             return Explanation.failed("The AI declined to help with this one.")
+        if self.history[0].get("image") and len(self.history) == 2 and looks_blind(reply.text):
+            return Explanation.failed("The AI couldn't see your screen that time - double-tap again to retry.")
         try:
             exp = parse_explanation(reply.text, self.shot)
         except (ValueError, KeyError, TypeError):

@@ -94,6 +94,10 @@ class SettingsWindow:
         self.instant = tk.BooleanVar(w, s.instant)
         t.Toggle(g.body, self.instant, "Look straight away", "Off = ask \"what are you stuck on?\" first").pack(
             fill="x", pady=(0, 10))
+        self.compact = tk.BooleanVar(w, s.compact)
+        t.Toggle(g.body, self.compact, "Speech bubble by the cursor",
+                 "Small Clicky-style text that talks you through it and fades; clicks go straight through. "
+                 "Off = the big card.").pack(fill="x", pady=(0, 10))
         self.visible = tk.BooleanVar(w, s.buddy_visible)
         t.Toggle(g.body, self.visible, "Show the cursor buddy", "Ctrl+Alt+H or the tray icon also toggles it").pack(
             fill="x", pady=(0, 10))
@@ -164,6 +168,7 @@ class SettingsWindow:
         s.buddy_visible = self.visible.get()
         s.trigger = {v: k for k, v in TRIGGER_LABELS.items()}.get(self.trigger.get(), "double_rctrl")
         s.instant = self.instant.get()
+        s.compact = self.compact.get()
         label_to_mode = {v: k for k, v in MODE_LABELS.items()}
         s.mode = label_to_mode.get(self.mode.get(), "breakdown")
         s.provider = self.provider.get() if self.provider.get() in ("anthropic", "deepseek") else "anthropic"

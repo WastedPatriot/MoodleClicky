@@ -165,6 +165,13 @@ class Director:
                                      y=int(py + (y - py) * i / steps))
             self.pump(0.03, record)
 
+    def wait_speech(self, app: App, record: bool = False) -> None:
+        for _ in range(400):
+            self.pump(0.03, record)
+            if not app.busy and app.player.playing:
+                return
+        raise RuntimeError("no speech")
+
     def wait_result(self, app: App, record: bool = False) -> None:
         for _ in range(400):
             self.pump(0.03, record)
@@ -189,32 +196,32 @@ def main() -> None:
     DOCS.mkdir(exist_ok=True)
     d = Director()
 
-    # --- demo GIF: follow -> ask -> think -> fly to each step ----------
-    app = make_app(d, BREAKDOWN, "breakdown", slow=True)
+    # --- demo GIF: follow -> double-tap Right Ctrl -> speech bubble talks it through ----------
+    import moodleclicky.speech as speech
+
+    speech.reading_time = lambda text: 1.7  # brisker pauses so the GIF stays short
+    app = make_app(d, dict(BREAKDOWN, type_text="c. O(n²)"), "breakdown", slow=True)
     d.move(1150, 760)
     d.pump(0.4)
     d.move(560, 420, steps=30, record=True)
     d.pump(0.5, record=True)
-    app.start_prompt()
-    d.pump(0.8, record=True)
-    app.bubble.entry.insert(0, "I don't get why it isn't O(n)")
-    d.pump(0.6, record=True)
-    app.bubble._submit()
-    d.wait_result(app, record=True)
-    d.pump(1.0, record=True)
-    for _ in range(4):
-        app.bubble.next()
-        d.pump(1.4, record=True)
-    app.bubble.jump_answer()
-    d.pump(1.8, record=True)
-    frames = d.frames[::2]
-    frames[0].save(DOCS / "demo.gif", save_all=True, append_images=frames[1:], duration=60, loop=0, optimize=True)
+    app.on_trigger()  # what a double-tap of Right Ctrl does
+    d.wait_speech(app, record=True)
+    stills = {}
+    for _ in range(900):
+        d.pump(0.05, record=True)
+        if app.player.idx == 2 and "pointing" not in stills:
+            d.pump(1.0, record=True)
+            stills["pointing"] = True
+            d.snap("pointing.png")
+        if not app.player.playing:
+            break
+    frames = d.frames[::3]
+    frames[0].save(DOCS / "demo.gif", save_all=True, append_images=frames[1:], duration=90, loop=0, optimize=True)
     print("wrote demo.gif", len(frames), "frames")
 
-    # --- stills ---------------------------------------------------------
-    app.bubble.idx = 2
-    app.bubble._render()
-    d.snap("pointing.png")
+    # --- the full card (tray -> Show full answer, or Ctrl+Alt+Space) ------------------
+    app.show_full_answer()
     app.bubble.jump_answer()
     d.snap("answer.png")
     app.bubble.close()
@@ -224,8 +231,10 @@ def main() -> None:
     app.bubble.close()
     app.buddy.win.destroy()
     app.bubble.win.destroy()
+    app.speech.win.destroy()
 
     happ = make_app(d, HINT, "hint")
+    happ.settings.compact = False  # show the hint in the full card for the README
     d.move(560, 420)
     happ.ask("")
     d.wait_result(happ)

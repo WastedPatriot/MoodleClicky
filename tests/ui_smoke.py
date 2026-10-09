@@ -115,18 +115,29 @@ def main(out=None):
     fake.chunks = [text[i:i + 20] for i in range(0, len(text), 20)]
     app.tutor = Tutor(app.settings, client=fake)
     app.settings.instant = True
-    partials = []
-    orig_partial = b.show_partial
-    b.show_partial = lambda f: (partials.append(f), orig_partial(f))
+    app.settings.compact = True
+    said = []
+    orig_say = app.speech.say
+    app.speech.say = lambda text, tag="", instant=False: (said.append((tag, text)), orig_say(text, tag, instant))
     app.on_trigger()
+    assert app.buddy.scale_target > 1.0  # the buddy grows while it works
     for _ in range(300):
         pump(root, 0.02)
-        if b.state == "showing" and not app.busy:
+        if not app.busy and app.player.playing:
             break
-    assert b.state == "showing", b.state  # never went through the "what are you stuck on?" prompt
-    assert partials and partials[0].get("title"), partials
-    assert b.type_box.winfo_ismapped() and "O(n^2)" in b.type_preview.cget("text")
-    assert "Right Ctrl ×2" in b.footer.cget("text")
+    assert b.state == "hidden", b.state  # no big card, no "what are you stuck on?" prompt
+    assert app.speech.visible and app.player.playing
+    assert said and said[0][1] == SAMPLE["summary"], said  # streamed summary is said first
+    # it talks through the steps, pointing at each one
+    for _ in range(200):
+        pump(root, 0.05)
+        if app.player.idx >= 1:
+            break
+    assert app.player.idx >= 1 and app.buddy.target_point is not None
+    assert said[-1][0] == "1 / 3", said[-1]
+    w = app.speech.win.winfo_width()
+    assert 80 <= w <= 320, w  # small, not a big panel
+    assert app.pending_type == "O(n^2)" and app._suggestion_up()
 
     import moodleclicky.typer as typer
 
@@ -164,7 +175,19 @@ def main(out=None):
     assert pasted == "O(n^2)", pasted
     assert ("press", "v") in kb.log and kb.log[0][0] == "down", kb.log  # Ctrl+V
     assert root.clipboard_get() == "my old clipboard"  # clipboard put back
-    assert "Typed" in b.footer.cget("text") and not b.type_box.winfo_ismapped()
+    assert app.pending_type == "" and said[-1][1].startswith("✓ Typed")
+    pump(root, 3.0)
+    assert not app.speech.visible and app.buddy.scale_target == 1.0  # fades and shrinks back
+
+    # Esc stops it talking; tray "Show full answer" opens the full card
+    app.player.play([__import__("moodleclicky.speech", fromlist=["Line"]).Line("hello", secs=30)])
+    pump(root, 0.2)
+    assert app.speech.visible
+    app.dismiss()
+    assert not app.speech.visible and not app.player.playing
+    app.show_full_answer()
+    pump(root, 0.2)
+    assert b.state == "showing" and b.title.cget("text") == SAMPLE["title"]
     b.close()
 
     root.destroy()

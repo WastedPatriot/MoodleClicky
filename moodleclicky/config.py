@@ -46,6 +46,7 @@ class Settings:
     mode: str = "breakdown"
     trigger: str = "double_rctrl"  # double_rctrl | double_ctrl | right_ctrl | hotkey  (see triggers.py)
     instant: bool = True  # look straight away; False = ask "what are you stuck on?" first
+    compact: bool = True  # Clicky-style speech bubble by the buddy; False = the full card
     hotkey_ask: str = "<ctrl>+<alt>+<space>"  # always opens the type-a-question prompt
     hotkey_toggle: str = "<ctrl>+<alt>+h"
     buddy_visible: bool = True

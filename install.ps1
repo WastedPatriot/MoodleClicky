@@ -26,7 +26,7 @@ $RawScript = "https://raw.githubusercontent.com/$Repo/main/install.ps1"
 function Say($text, $color = "Gray") { Write-Host $text -ForegroundColor $color }
 function Step($text) { Write-Host ""; Write-Host "  > $text" -ForegroundColor Cyan }
 function Banner {
-    Clear-Host
+    try { Clear-Host } catch { }  # no real console (e.g. CI) - just carry on
     Say ""
     Say "   __  __                 _ _       ____ _ _      _          " Blue
     Say "  |  \/  | ___   ___   __| | | ___ / ___| (_) ___| | ___   _ " Blue

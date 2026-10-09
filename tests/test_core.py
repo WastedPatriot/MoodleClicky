@@ -198,3 +198,18 @@ def test_api_keys_per_provider(monkeypatch):
     from moodleclicky.brain import has_key
 
     assert has_key(Settings(provider="deepseek"))
+
+
+def test_apply_setup_from_installer(tmp_path):
+    from moodleclicky.setup_cli import apply_setup
+
+    stored, auto = {}, []
+    s = Settings()
+    lines = apply_setup({"provider": "deepseek", "api_key": " sk-test-1234 ", "your_name": "Dom",
+                         "course_context": "Birkbeck CS", "start_with_windows": True, "record_mic": False,
+                         "whisper_model": "base.en", "bogus": 1},
+                        settings=s, store_key=lambda k, p: stored.update({p: k}) or True, autostart=auto.append)
+    assert stored == {"deepseek": "sk-test-1234"} and auto == [True]
+    assert s.provider == "deepseek" and s.your_name == "Dom" and not s.record_mic and s.whisper_model == "base.en"
+    assert any("1234" in x for x in lines) and not any("sk-test" in x for x in lines)  # key never logged
+    assert Settings.load().your_name == "Dom"  # persisted

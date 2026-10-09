@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "moodleclicky"
-version = "0.2.0"
+version = "0.2.1"
 description = "A desktop cursor study buddy: press a hotkey, it looks at your screen and walks you through the answer step by step."
 readme = "README.md"
 requires-python = ">=3.11"

@@ -5,18 +5,25 @@
 ![MoodleClicky demo](docs/demo.gif)
 
 > Personal Windows desktop app. Works with **Claude** or **DeepSeek**. Inspired by [Clicky](https://github.com/farzaa/clicky) for Mac, built for studying.
+> Also has a **lecture and meeting notetaker** that records, transcribes on your PC, and catches you up if you zone out.
 
 ---
 
 ## Quick start (Windows)
 
-1. Install **Python 3.11+** from [python.org](https://www.python.org/downloads/) and tick *"Add python.exe to PATH"*.
-2. Download this repo (**Code → Download ZIP**) and unzip it.
-3. Double-click **`run.bat`**. The first run sets everything up, which takes about a minute.
-4. In the settings window, paste your API key: either a [Claude key](https://console.anthropic.com) or a [DeepSeek key](https://platform.deepseek.com).
+**Option A: ready-made app (no Python needed)**
+
+1. Open the **Actions** tab, then the latest green **CI** run, then download **MoodleClicky-windows**. Or grab it from **Releases**.
+2. Unzip it anywhere (e.g. `Documents\MoodleClicky`).
+3. Double-click **`MoodleClicky.exe`**.
+4. Paste your API key in the settings window: a [Claude key](https://console.anthropic.com) or a [DeepSeek key](https://platform.deepseek.com).
 5. Hover over a question and press **Ctrl + Alt + Space**.
 
-The buddy then sits in your system tray. Click the tray icon to show or hide it.
+**Option B: from source**
+
+Install **Python 3.11+** from [python.org](https://www.python.org/downloads/) (tick *"Add python.exe to PATH"*). Download this repo, then double-click **`run.bat`**. The first run sets everything up.
+
+The buddy then sits in your system tray. Click the tray icon to show or hide it. Turn on **Start with Windows** in Settings and it's always there.
 
 ## Hotkeys
 
@@ -24,6 +31,8 @@ The buddy then sits in your system tray. Click the tray icon to show or hide it.
 |---|---|
 | **Ctrl + Alt + Space** | "What are you stuck on?" Type a question, or just press Enter and it looks at what's under your cursor |
 | **Ctrl + Alt + H** | Show or hide the cursor buddy |
+| **Ctrl + Alt + N** | Open the lecture / meeting notetaker |
+| **Ctrl + Alt + M** | ⭐ Mark "this bit matters" while recording (highlighted in your notes) |
 | **← / →** | Previous / next step in the pop-up |
 | **Esc** | Close the pop-up |
 
@@ -49,6 +58,29 @@ Switch modes in the pop-up at any time. You can also type follow-up questions ("
 
 <img src="docs/settings.png" alt="Settings" width="480">
 
+## 🎙️ Lecture and meeting notetaker
+
+For lectures (in person, Teams, Zoom or Panopto) and group-project meetings, especially when you can't give it 100% attention.
+
+1. **Ctrl + Alt + N** (or tray → *Lecture / meeting notetaker*), pick **Lecture** or **Group meeting**, then press **Start**.
+2. It records your **microphone and/or computer audio** and transcribes it **on your PC** (free, offline speech-to-text with Whisper). The live transcript scrolls as it goes.
+3. Zoned out? Press **Catch me up** (2, 5 or 10 minutes). You get what's being discussed right now, what you missed, anything aimed at **you**, and something sensible to say if you're put on the spot.
+4. Press **Make notes** at the end:
+   - **Lecture**: summary, key points, concepts explained, examples, your ⭐ moments, to-dos and deadlines, "test yourself" questions.
+   - **Group meeting**: decisions, who's doing what, **your tasks** (set your name in Settings), and a step-by-step plan.
+
+| Live notetaker | Meeting notes it writes |
+|---|---|
+| ![Notetaker](docs/notetaker.png) | ![Meeting notes](docs/meeting_notes.png) |
+
+**Built not to lose your notes:**
+- The transcript is saved as it happens. If the laptop dies mid-lecture, reopen the session under **Past** and make notes from what was saved.
+- If your mic gets unplugged, it keeps retrying.
+- If no sound is playing, recording carries on regardless.
+- Audio is deleted once it's transcribed.
+
+Only record where you're allowed to, and tell your group first.
+
 ## Revision notes, for free
 
 Every explanation is saved as Markdown, one file per day, in
@@ -60,6 +92,7 @@ Every explanation is saved as Markdown, one file per day, in
   - Claude Opus 5.5: about $0.01–0.03 per question.
   - DeepSeek Flash: a fraction of a cent.
 - A screenshot is taken **only when you press the hotkey**. It's sent to the AI provider you picked and isn't stored anywhere else.
+- Lecture audio never leaves your PC. Only the text transcript goes to the AI, and only when you press *Catch me up* or *Make notes*.
 - Your API keys are stored in **Windows Credential Manager**, not in a text file.
 
 ## How it works
@@ -79,6 +112,10 @@ hotkey ─► hide own windows ─► screenshot the monitor under the cursor (c
 | `moodleclicky/bubble.py` | The pop-up (pages, back/next, show answer, follow-ups) |
 | `moodleclicky/settings_ui.py` / `config.py` | Settings window, and settings stored in `%APPDATA%\MoodleClicky` |
 | `moodleclicky/notes.py` | Daily revision notes |
+| `moodleclicky/lecture/` | Notetaker: `audio.py` (mic + loopback recorder), `transcribe.py` (Whisper), `session.py` (crash-safe sessions), `summarise.py` (notes, meeting plan, catch-up) |
+| `moodleclicky/lecture_ui.py` | Notetaker window + notes viewer |
+| `moodleclicky/theme.py` | Shared dark theme: pill buttons, segmented controls, toggles, cards |
+| `moodleclicky/selftest.py` | `MoodleClicky.exe --selftest`: checks the build end to end, offline |
 
 ## Development
 
@@ -90,7 +127,9 @@ xvfb-run -a -s "-screen 0 1600x900x24" python tests/ui_smoke.py   # drives the r
 xvfb-run -a -s "-screen 0 1600x900x24" python tools/make_docs.py  # regenerates the screenshots + GIF
 ```
 
-Optional single `.exe`: `tools\build_exe.bat` (PyInstaller, output in `dist\`).
+Build the Windows app yourself: `tools\build_exe.bat`. It runs PyInstaller, then self-tests the built `.exe`, and writes the output to `dist\MoodleClicky-windows.zip`. CI does the same on every push. Tag `v*` to publish a Release.
+
+**Troubleshooting:** everything is logged to `%APPDATA%\MoodleClicky\moodleclicky.log`. Run `MoodleClicky.exe --selftest report.txt` to check an install.
 
 ## Use it fairly
 

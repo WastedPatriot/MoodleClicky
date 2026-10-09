@@ -1,6 +1,5 @@
 @echo off
-rem Optional: build a single MoodleClicky.exe with PyInstaller (output in dist\).
+rem Build MoodleClicky.exe (dist\MoodleClicky\) and run its self-test. Needs Python 3.11+ on PATH.
 cd /d "%~dp0\.."
-if not exist .venv\Scripts\python.exe call run.bat
-.venv\Scripts\python -m pip install pyinstaller
-.venv\Scripts\pyinstaller --noconfirm --onefile --windowed --name MoodleClicky --hidden-import pystray._win32 --hidden-import pynput.keyboard._win32 --hidden-import pynput.mouse._win32 --hidden-import keyring.backends.Windows moodleclicky\__main__.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\build_windows.ps1
+pause

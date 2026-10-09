@@ -15,7 +15,15 @@ the Clippy-style bubble pages through summary → steps → answer → why → c
 - `buddy.py` the arrow sprite (x/y = tip position); `bubble.py` the pop-up (pages, nav, follow-ups)
 - `settings_ui.py`, `config.py` (JSON in %APPDATA%\MoodleClicky, API key in Windows Credential Manager)
 - `notes.py` daily Markdown revision notes; `winutil.py` DPI awareness + click-through (Windows only)
+- `brain.py` backends: ClaudeBackend (anthropic SDK) + DeepSeekBackend (stdlib HTTP, deepseek-flash vision + JSON
+  mode); history is provider-neutral dicts
+- `lecture/` notetaker: audio.py (soundcard mic+loopback, wall-clock mixer, 30 s WAV chunks), transcribe.py
+  (faster-whisper, we decode WAV ourselves - no PyAV), session.py (crash-safe session.json/transcript.md),
+  summarise.py (lecture/meeting/catch-up schemas); `lecture_ui.py` panel; `theme.py` shared dark widgets
+- `selftest.py`: `python -m moodleclicky --selftest [report] [--with-model]` - offline end-to-end check (CI runs it
+  against the built exe)
 - `tools/make_docs.py` regenerates docs/*.png + demo.gif under xvfb (no API calls)
+- `tools/build_windows.ps1` PyInstaller onedir build + exe self-test + zip (CI windows job, tags -> Release)
 
 ## Rules
 - Commit author: Claude <noreply@anthropic.com>. Lint: `ruff check .`, `bandit -r moodleclicky`.
@@ -24,6 +32,6 @@ the Clippy-style bubble pages through summary → steps → answer → why → c
 - Default model `claude-opus-5-5`, adaptive thinking, effort from settings, server-side fallbacks on.
 
 ## Ideas / next up
-1. Push-to-talk voice question (hold hotkey, speak).
+1. Push-to-talk voice question (hold hotkey, speak) - reuse lecture/transcribe.py.
 2. "Explain like I'm tired" brevity slider; per-module course context presets.
-3. Start-with-Windows toggle in settings.
+3. Notetaker: grab slide screenshots at ⭐ marks and attach them to notes.

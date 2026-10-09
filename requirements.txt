@@ -4,3 +4,6 @@ pillow>=10
 pynput>=1.7
 pystray>=0.19
 keyring>=24
+numpy>=1.26
+soundcard>=0.4.4
+faster-whisper>=1.1

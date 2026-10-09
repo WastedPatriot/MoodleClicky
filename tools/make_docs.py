@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -235,12 +236,109 @@ def main() -> None:
     happ.open_settings()
     d.pump(0.5)
     sw = happ._settings_win.win
-    sw.geometry("+560+160")
+    sw.geometry("+560+40")
     d.pump(0.5)
     sw.update_idletasks()
     x, y, w, h = sw.winfo_rootx(), sw.winfo_rooty(), sw.winfo_width(), sw.winfo_height()
     d.snap("settings.png", crop=(x - 2, y - 2, x + w + 2, y + h + 2))
+    sw.destroy()
+    notetaker_shots(d, happ)
     d.root.destroy()
+
+
+MEETING_LINES = [
+    "Okay so the deadline for the group report is the twenty-first.",
+    "I think we should split it into four sections, one each.",
+    "Priya, can you take the literature review?",
+    "Sure. Dom, could you do the database design and the ER diagram?",
+    "We also need someone to book the presentation slot.",
+    "Let's meet again Thursday at six to merge everything.",
+]
+MEETING_NOTES = {
+    "title": "Group project - kick-off",
+    "tl_dr": "Report due on the 21st. Work split four ways; next sync Thursday 6pm.",
+    "decisions": ["Split the report into four sections, one per person", "Meet Thursday 6pm to merge"],
+    "action_items": [{"who": "Priya", "task": "Literature review", "due": "Thu"},
+                     {"who": "Dom", "task": "Database design + ER diagram", "due": "Thu"},
+                     {"who": "Unassigned", "task": "Book the presentation slot", "due": ""}],
+    "my_tasks": ["Database design + ER diagram (by Thursday)", "Offer to book the presentation slot"],
+    "plan": [{"step": "Draft own section", "owner": "Everyone", "when": "by Thu"},
+             {"step": "Merge + edit at Thursday meeting", "owner": "Everyone", "when": "Thu 6pm"},
+             {"step": "Final proofread and submit", "owner": "Priya", "when": "by the 21st"}],
+    "open_questions": ["Who books the presentation slot?"],
+    "risks": ["Only one sync before the deadline"],
+}
+
+
+def notetaker_shots(d: Director, app: App) -> None:
+    import numpy as np
+
+    from moodleclicky.brain import Reply
+    from moodleclicky.lecture import summarise
+    from moodleclicky.lecture.audio import write_wav
+    from moodleclicky.lecture.session import Session
+    from moodleclicky.lecture.transcribe import Segment
+    from moodleclicky.lecture_ui import NotesViewer, NotetakerWindow
+
+    class Rec:
+        def __init__(self, folder, on_chunk):
+            self.folder, self.on_chunk, self.recorded_secs, self.level = Path(folder), on_chunk, 0.0, 0.42
+            self.folder.mkdir(parents=True, exist_ok=True)
+
+        def start(self):
+            for i in range(len(MEETING_LINES)):
+                p = self.folder / f"chunk_{i:04d}.wav"
+                write_wav(p, np.zeros(1600, dtype=np.float32))
+                self.on_chunk(p, i * 41.0)
+            self.recorded_secs = 1012
+
+        def status(self):
+            return "mic: ok · computer audio: ok"
+
+        def pause(self):
+            pass
+
+        def resume(self):
+            pass
+
+        def stop(self):
+            pass
+
+    class Tx:
+        def transcribe(self, wav, offset, prompt=""):
+            return [Segment(offset, offset + 8, MEETING_LINES[int(offset // 41)])]
+
+    class Backend:
+        def chat(self, settings, system, history, schema):
+            return Reply(json.dumps(MEETING_NOTES), None, 0.004, "end")
+
+    summarise.make_backend = lambda settings: Backend()
+    app.settings.your_name = "Dom"
+    nt = NotetakerWindow(d.root, app.settings, app.call_soon, lambda p: None,
+                         session_factory=lambda st, kind, on_update: Session(
+                             st, kind, recorder_factory=Rec, transcriber=Tx(), on_update=on_update))
+    nt.win.geometry("460x760+80+60")
+    nt.kind.set("meeting")
+    nt.start()
+    for _ in range(100):
+        d.pump(0.03)
+        if len(nt.session.segments) == len(MEETING_LINES):
+            break
+    nt.session.mark()
+    nt.refresh()
+    d.pump(0.5)
+    nt.win.update_idletasks()
+    x, y, w, h = nt.win.winfo_rootx(), nt.win.winfo_rooty(), nt.win.winfo_width(), nt.win.winfo_height()
+    d.snap("notetaker.png", crop=(x - 2, y - 2, x + w + 2, y + h + 2))
+    md = summarise.notes_markdown("meeting", MEETING_NOTES, "Thu 09 Oct 2026, 14:05", "16:52")
+    v = NotesViewer(d.root, MEETING_NOTES["title"], md, on_open=lambda: None)
+    v.win.geometry("560x640+560+60")
+    d.pump(0.5)
+    v.win.update_idletasks()
+    x, y, w, h = v.win.winfo_rootx(), v.win.winfo_rooty(), v.win.winfo_width(), v.win.winfo_height()
+    d.snap("meeting_notes.png", crop=(x - 2, y - 2, x + w + 2, y + h + 2))
+    nt.session.stop()
+    nt.session.wait(5)
 
 
 if __name__ == "__main__":

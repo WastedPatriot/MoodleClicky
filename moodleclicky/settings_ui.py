@@ -4,87 +4,166 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
-from tkinter import ttk
 
+from moodleclicky import theme as t
 from moodleclicky.brain import PRICES
-from moodleclicky.config import EFFORTS, MODE_LABELS, MODES, Settings, get_api_key, set_api_key
+from moodleclicky.config import (
+    DEFAULT_MODELS,
+    EFFORTS,
+    MODE_LABELS,
+    MODES,
+    WHISPER_MODELS,
+    Settings,
+    get_api_key,
+    set_api_key,
+)
+
+KEY_HINTS = {
+    "anthropic": "Get one at console.anthropic.com → API keys (starts with sk-ant-).",
+    "deepseek": "Get one at platform.deepseek.com → API keys. Cheaper; needs a vision model.",
+}
 
 
 class SettingsWindow:
     def __init__(self, root: tk.Tk, settings: Settings, on_save: Callable[[Settings], None],
                  open_notes: Callable[[], None]):
-        self.settings = settings
+        self.settings = s = settings
         self.on_save = on_save
         w = self.win = tk.Toplevel(root)
-        w.title("MoodleClicky settings")
+        w.title("MoodleClicky · Settings")
         w.attributes("-topmost", True)
-        w.resizable(False, False)
-        f = ttk.Frame(w, padding=14)
-        f.pack(fill="both", expand=True)
+        t.style_window(w)
+        f = t.fonts(w)
 
-        self.visible = tk.BooleanVar(value=settings.buddy_visible)
-        ttk.Checkbutton(f, text="Show the cursor buddy", variable=self.visible).grid(
-            row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        outer = tk.Frame(w, bg=t.BG)
+        outer.pack(fill="both", expand=True, padx=16, pady=14)
+        top = tk.Frame(outer, bg=t.BG)
+        top.pack(fill="x", pady=(0, 10))
+        tk.Label(top, text="Settings", bg=t.BG, fg=t.INK, font=f.display).pack(side="left")
 
-        rows: list[tuple[str, tk.Widget]] = []
-        self.key = tk.StringVar(value=get_api_key())
-        key_entry = ttk.Entry(f, textvariable=self.key, show="•", width=42)
-        rows.append(("Anthropic API key", key_entry))
+        bar = tk.Frame(outer, bg=t.BG)
+        bar.pack(fill="x", side="bottom", pady=(12, 0))
+        t.PillButton(bar, "Save", self._save, kind="primary").pack(side="right")
+        t.PillButton(bar, "Cancel", w.destroy, kind="ghost").pack(side="right", padx=6)
+        t.PillButton(bar, "Open notes folder", open_notes).pack(side="left")
 
-        self.mode = tk.StringVar(value=MODE_LABELS[settings.mode])
-        rows.append(("Default mode", ttk.Combobox(f, textvariable=self.mode, state="readonly", width=40,
-                                                  values=[MODE_LABELS[m] for m in MODES])))
-        self.model = tk.StringVar(value=settings.model)
-        rows.append(("Model", ttk.Combobox(f, textvariable=self.model, width=40, values=list(PRICES))))
-        self.effort = tk.StringVar(value=settings.effort)
-        rows.append(("Thinking effort", ttk.Combobox(f, textvariable=self.effort, state="readonly",
-                                                     width=40, values=list(EFFORTS))))
-        self.course = tk.StringVar(value=settings.course_context)
-        rows.append(("Your course (optional)", ttk.Entry(f, textvariable=self.course, width=42)))
-        self.hk_ask = tk.StringVar(value=settings.hotkey_ask)
-        rows.append(("Ask hotkey", ttk.Entry(f, textvariable=self.hk_ask, width=42)))
-        self.hk_toggle = tk.StringVar(value=settings.hotkey_toggle)
-        rows.append(("Show/hide hotkey", ttk.Entry(f, textvariable=self.hk_toggle, width=42)))
-        self.color = tk.StringVar(value=settings.buddy_color)
-        rows.append(("Buddy colour", ttk.Entry(f, textvariable=self.color, width=42)))
+        scroll = t.ScrollFrame(outer, max_height=min(620, w.winfo_screenheight() - 220))
+        scroll.pack(fill="both", expand=True)
+        body = scroll.body
 
-        for i, (label, widget) in enumerate(rows, start=1):
-            ttk.Label(f, text=label).grid(row=i, column=0, sticky="w", padx=(0, 10), pady=3)
-            widget.grid(row=i, column=1, sticky="w", pady=3)
+        # -- General
+        g = t.Card(body, "General", "How the buddy behaves.")
+        g.pack(fill="x", pady=(0, 10))
+        self.visible = tk.BooleanVar(w, s.buddy_visible)
+        t.Toggle(g.body, self.visible, "Show the cursor buddy", "Ctrl+Alt+H or the tray icon also toggles it").pack(
+            fill="x", pady=(0, 10))
+        self.mode = tk.StringVar(w, MODE_LABELS[s.mode])
+        t.form_row(g.body, "Start in this mode", lambda p: t.Segmented(
+            p, [(MODE_LABELS[m], m.capitalize()) for m in MODES], variable=self.mode),
+            hint="Breakdown = answer + steps · Hint = no spoilers · Check = marks your working")
+        self.open_answer = tk.BooleanVar(w, s.open_on_answer)
+        t.Toggle(g.body, self.open_answer, "Jump straight to the answer", "Skip the walkthrough").pack(
+            fill="x", pady=(0, 10))
+        self.course = tk.StringVar(w, s.course_context)
+        t.form_row(g.body, "Your course (optional)", lambda p: t.Field(p, self.course,
+                   placeholder="e.g. Birkbeck BSc Computer Science, Year 2"),
+                   hint="Helps explanations match your level and module names.")
+        self.color = tk.StringVar(w, s.buddy_color)
+        t.form_row(g.body, "Buddy colour", lambda p: t.Field(p, self.color, placeholder="#2f80ed"))
+        self.autostart = tk.BooleanVar(w, s.start_with_windows)
+        t.Toggle(g.body, self.autostart, "Start with Windows", "Sits quietly in the tray after you log in").pack(
+            fill="x")
 
-        r = len(rows) + 1
-        self.open_answer = tk.BooleanVar(value=settings.open_on_answer)
-        ttk.Checkbutton(f, text="Jump straight to the answer (skip the walkthrough)",
-                        variable=self.open_answer).grid(row=r, column=0, columnspan=2, sticky="w", pady=(8, 0))
-        self.notes = tk.BooleanVar(value=settings.save_notes)
-        ttk.Checkbutton(f, text="Save every explanation to my revision notes",
-                        variable=self.notes).grid(row=r + 1, column=0, columnspan=2, sticky="w")
-        ttk.Label(f, foreground="#777", text="Hotkeys use pynput format, e.g. <ctrl>+<alt>+<space>").grid(
-            row=r + 2, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        # -- AI provider
+        a = t.Card(body, "AI provider", "Use your own key. Each answer shows roughly what it cost.")
+        a.pack(fill="x", pady=(0, 10))
+        self.provider = tk.StringVar(w, s.provider)
+        t.Segmented(a.body, [("anthropic", "Claude"), ("deepseek", "DeepSeek")], variable=self.provider,
+                    command=lambda _v: self._show_provider()).pack(anchor="w", pady=(0, 12))
+        self.keys = {p: tk.StringVar(w, get_api_key(p)) for p in ("anthropic", "deepseek")}
+        self.models = {"anthropic": tk.StringVar(w, s.model), "deepseek": tk.StringVar(w, s.deepseek_model)}
+        self.provider_frames = {}
+        for p, label in (("anthropic", "Claude"), ("deepseek", "DeepSeek")):
+            fr = tk.Frame(a.body, bg=t.CARD)
+            t.form_row(fr, f"{label} API key", lambda par, p=p: t.Field(par, self.keys[p], show="•", eye=True,
+                                                                        placeholder="paste your key"),
+                       hint=KEY_HINTS[p])
+            options = [m for m in PRICES if m.startswith("claude" if p == "anthropic" else "deepseek")]
+            t.form_row(fr, "Model", lambda par, p=p, o=options: t.combobox(par, self.models[p], o),
+                       hint=f"Default: {DEFAULT_MODELS[p]}")
+            self.provider_frames[p] = fr
+        self.effort = tk.StringVar(w, s.effort)
+        self.effort_row = t.form_row(a.body, "Thinking effort", lambda p: t.Segmented(
+            p, [(e, e.capitalize()) for e in EFFORTS], variable=self.effort),
+            hint="Higher = more careful, slower, a bit pricier.", pady=(4, 0))
+        self._show_provider()
 
-        btns = ttk.Frame(f)
-        btns.grid(row=r + 3, column=0, columnspan=2, sticky="e", pady=(12, 0))
-        ttk.Button(btns, text="Open notes folder", command=open_notes).pack(side="left", padx=(0, 16))
-        ttk.Button(btns, text="Cancel", command=w.destroy).pack(side="left", padx=4)
-        ttk.Button(btns, text="Save", command=self._save).pack(side="left")
+        # -- Notetaker
+        n = t.Card(body, "Lecture notetaker", "Records, transcribes on this PC, then the AI makes notes.")
+        n.pack(fill="x", pady=(0, 10))
+        self.rec_mic = tk.BooleanVar(w, s.record_mic)
+        t.Toggle(n.body, self.rec_mic, "Record my microphone", "In-person lectures and group meetings").pack(
+            fill="x", pady=(0, 8))
+        self.rec_system = tk.BooleanVar(w, s.record_system)
+        t.Toggle(n.body, self.rec_system, "Record computer audio", "Teams, Zoom, Panopto, YouTube").pack(
+            fill="x", pady=(0, 10))
+        self.whisper = tk.StringVar(w, s.whisper_model)
+        t.form_row(n.body, "Speech-to-text model", lambda p: t.combobox(p, self.whisper, WHISPER_MODELS,
+                                                                        readonly=True),
+                   hint="small.en = good balance. First use downloads it (~250 MB).")
+        self.name = tk.StringVar(w, s.your_name)
+        t.form_row(n.body, "Your name", lambda p: t.Field(p, self.name, placeholder="e.g. Dom"),
+                   hint="So group-meeting notes can pull out your tasks.", pady=(0, 0))
+
+        # -- Hotkeys
+        h = t.Card(body, "Hotkeys", "pynput format, e.g. <ctrl>+<alt>+<space>")
+        h.pack(fill="x", pady=(0, 10))
+        self.hk = {}
+        for key, label in (("hotkey_ask", "Ask about my screen"), ("hotkey_toggle", "Show / hide buddy"),
+                           ("hotkey_notes", "Open notetaker"), ("hotkey_mark", "Mark important moment")):
+            self.hk[key] = tk.StringVar(w, getattr(s, key))
+            t.form_row(h.body, label, lambda p, k=key: t.Field(p, self.hk[k]), pady=(0, 8))
+
+        # -- Notes
+        nn = t.Card(body, "Revision notes")
+        nn.pack(fill="x")
+        self.notes = tk.BooleanVar(w, s.save_notes)
+        t.Toggle(nn.body, self.notes, "Save every explanation to my notes", "One Markdown file per day").pack(
+            fill="x")
+
         w.bind("<Escape>", lambda _e: w.destroy())
+        w.update_idletasks()
+        w.geometry(f"520x{min(780, w.winfo_screenheight() - 80)}")
         w.focus_force()
+
+    def _show_provider(self) -> None:
+        for fr in self.provider_frames.values():
+            fr.pack_forget()
+        self.provider_frames[self.provider.get()].pack(fill="x", before=self.effort_row.master)
 
     def _save(self) -> None:
         s = self.settings
         s.buddy_visible = self.visible.get()
         label_to_mode = {v: k for k, v in MODE_LABELS.items()}
         s.mode = label_to_mode.get(self.mode.get(), "breakdown")
-        s.model = self.model.get().strip() or "claude-opus-5-5"
+        s.provider = self.provider.get() if self.provider.get() in ("anthropic", "deepseek") else "anthropic"
+        s.model = self.models["anthropic"].get().strip() or DEFAULT_MODELS["anthropic"]
+        s.deepseek_model = self.models["deepseek"].get().strip() or DEFAULT_MODELS["deepseek"]
         s.effort = self.effort.get() if self.effort.get() in EFFORTS else "medium"
         s.course_context = self.course.get().strip()
-        s.hotkey_ask = self.hk_ask.get().strip() or s.hotkey_ask
-        s.hotkey_toggle = self.hk_toggle.get().strip() or s.hotkey_toggle
+        for key, var in self.hk.items():
+            setattr(s, key, var.get().strip() or getattr(s, key))
         s.buddy_color = self.color.get().strip() or s.buddy_color
         s.open_on_answer = self.open_answer.get()
         s.save_notes = self.notes.get()
-        if self.key.get().strip() != get_api_key():
-            set_api_key(self.key.get().strip())
+        s.start_with_windows = self.autostart.get()
+        s.record_mic = self.rec_mic.get()
+        s.record_system = self.rec_system.get()
+        s.whisper_model = self.whisper.get() if self.whisper.get() in WHISPER_MODELS else "small.en"
+        s.your_name = self.name.get().strip()
+        for p, var in self.keys.items():
+            if var.get().strip() != get_api_key(p):
+                set_api_key(var.get().strip(), p)
         s.save()
         self.on_save(s)
         self.win.destroy()

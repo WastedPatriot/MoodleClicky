@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import queue
 import subprocess  # nosec B404 - only used to open the notes folder
@@ -14,9 +15,11 @@ from moodleclicky import APP_NAME, __version__, capture, notes
 from moodleclicky.brain import Explanation, Tutor, has_key
 from moodleclicky.bubble import Bubble, Page
 from moodleclicky.buddy import Buddy
-from moodleclicky.config import Settings
+from moodleclicky.config import Settings, data_dir
 from moodleclicky.settings_ui import SettingsWindow
-from moodleclicky.winutil import enable_dpi_awareness
+from moodleclicky.winutil import SingleInstance, enable_dpi_awareness, set_autostart
+
+log = logging.getLogger(APP_NAME)
 
 
 class App:
@@ -32,6 +35,7 @@ class App:
         self._hotkeys = None
         self._tray = None
         self._settings_win: SettingsWindow | None = None
+        self._notetaker = None
 
         self.buddy = Buddy(root, settings.buddy_color)
         self.bubble = Bubble(
@@ -128,8 +132,22 @@ class App:
             return
         self._settings_win = SettingsWindow(self.root, self.settings, self._apply_settings, self.open_notes)
 
+    def open_notetaker(self) -> None:
+        if self._notetaker is None:
+            from moodleclicky.lecture_ui import NotetakerWindow
+
+            self._notetaker = NotetakerWindow(self.root, self.settings, self.call_soon, self.open_path)
+        self._notetaker.show()
+
+    def mark_moment(self) -> None:
+        """Hotkey while recording: flag 'this bit matters' without opening anything."""
+        if self._notetaker:
+            self._notetaker.mark()
+
     def open_notes(self) -> None:
-        path = str(notes.notes_dir())
+        self.open_path(str(notes.notes_dir()))
+
+    def open_path(self, path: str) -> None:
         if sys.platform == "win32":
             os.startfile(path)  # nosec B606 - our own folder
         elif sys.platform == "darwin":
@@ -138,6 +156,9 @@ class App:
             subprocess.Popen(["xdg-open", path])  # nosec B603 B607
 
     def quit(self) -> None:
+        nt = self._notetaker
+        if nt and nt.session and nt.session.state in ("recording", "paused"):
+            nt.session.stop()  # saves the last chunk; transcript so far is already on disk
         if self._hotkeys:
             self._hotkeys.stop()
         if self._tray:
@@ -182,6 +203,9 @@ class App:
         self.mode = s.mode
         self.buddy.set_color(s.buddy_color)
         (self.buddy.show if s.buddy_visible else self.buddy.hide)()
+        set_autostart(s.start_with_windows)
+        if self._notetaker:
+            self._notetaker.settings = s
         if self._hotkeys:
             self._hotkeys.stop()
             self._start_hotkeys()
@@ -192,27 +216,31 @@ class App:
         try:
             from pynput import keyboard
 
-            self._hotkeys = keyboard.GlobalHotKeys({
-                self.settings.hotkey_ask: lambda: self.call_soon(self.start_prompt),
-                self.settings.hotkey_toggle: lambda: self.call_soon(self.toggle_buddy),
-            })
+            s = self.settings
+            keys = {}
+            for combo, fn in ((s.hotkey_ask, self.start_prompt), (s.hotkey_toggle, self.toggle_buddy),
+                              (s.hotkey_notes, self.open_notetaker), (s.hotkey_mark, self.mark_moment)):
+                if combo and combo not in keys:
+                    keys[combo] = lambda fn=fn: self.call_soon(fn)
+            self._hotkeys = keyboard.GlobalHotKeys(keys)
             self._hotkeys.daemon = True
             self._hotkeys.start()
-        except Exception as e:  # bad hotkey string or no keyboard hook available
-            print(f"[{APP_NAME}] hotkeys disabled: {e}", file=sys.stderr)
+        except Exception:  # bad hotkey string or no keyboard hook available
+            log.exception("hotkeys disabled")
             self._hotkeys = None
 
     def _start_tray(self) -> None:
         try:
             import pystray
-        except Exception as e:
-            print(f"[{APP_NAME}] tray icon disabled: {e}", file=sys.stderr)
+        except Exception:
+            log.exception("tray icon disabled")
             return
         item = pystray.MenuItem
         menu = pystray.Menu(
             item("Show / hide buddy", lambda: self.call_soon(self.toggle_buddy), default=True,
                  checked=lambda _i: self.settings.buddy_visible),
             item("Ask about my screen", lambda: self.call_soon(self.start_prompt)),
+            item("Lecture / meeting notetaker…", lambda: self.call_soon(self.open_notetaker)),
             item("Settings…", lambda: self.call_soon(self.open_settings)),
             item("Open revision notes", lambda: self.call_soon(self.open_notes)),
             pystray.Menu.SEPARATOR,
@@ -222,8 +250,8 @@ class App:
                                   f"{APP_NAME} {__version__}", menu)
         try:
             self._tray.run_detached()
-        except Exception as e:
-            print(f"[{APP_NAME}] tray icon disabled: {e}", file=sys.stderr)
+        except Exception:
+            log.exception("tray icon disabled")
             self._tray = None
 
 
@@ -240,14 +268,42 @@ def tray_image(color: str):
     return img
 
 
+def setup_logging() -> None:
+    """Everything (including crashes in any thread) goes to %APPDATA%\\MoodleClicky\\moodleclicky.log."""
+    from logging.handlers import RotatingFileHandler
+
+    handler = RotatingFileHandler(data_dir() / "moodleclicky.log", maxBytes=1_000_000, backupCount=2,
+                                  encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(threadName)s: %(message)s"))
+    logging.basicConfig(level=logging.INFO, handlers=[handler])
+
+    def hook(exc_type, exc, tb):
+        log.error("unhandled error", exc_info=(exc_type, exc, tb))
+
+    sys.excepthook = hook
+    threading.excepthook = lambda a: hook(a.exc_type, a.exc_value, a.exc_traceback)
+
+
 def main() -> None:
+    if "--selftest" in sys.argv:
+        from moodleclicky.selftest import run
+
+        sys.exit(run(sys.argv[sys.argv.index("--selftest") + 1:]))
+    setup_logging()
     enable_dpi_awareness()
     root = tk.Tk()
     root.withdraw()  # all our windows are Toplevels
     root.title(APP_NAME)
+    root.report_callback_exception = lambda *exc: log.error("error in UI callback", exc_info=exc)
     settings = Settings.load()
-    app = App(root, settings)
+    box: dict = {}
+    instance = SingleInstance(on_poke=lambda: box["app"].call_soon(box["app"].start_prompt) if "app" in box
+                              else None)
+    if not instance.primary:
+        return  # already running - the other copy pops up instead
+    app = box["app"] = App(root, settings)
     if not has_key(settings):
         root.after(500, app.open_settings)
-    print(f"{APP_NAME} running. {settings.hotkey_ask} = ask, {settings.hotkey_toggle} = show/hide.")
+    log.info("%s %s running. %s = ask, %s = show/hide, %s = notetaker.", APP_NAME, __version__,
+             settings.hotkey_ask, settings.hotkey_toggle, settings.hotkey_notes)
     root.mainloop()

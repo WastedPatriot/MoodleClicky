@@ -1,0 +1,6 @@
+anthropic>=1.12
+mss>=9
+pillow>=10
+pynput>=1.7
+pystray>=0.19
+keyring>=24

@@ -14,7 +14,7 @@
 Open **PowerShell** (Start → type *PowerShell* → Enter) and paste:
 
 ```powershell
-irm https://raw.githubusercontent.com/WastedPatriot/moodleclicky/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/WastedPatriot/MoodleClicky/main/install.ps1 | iex
 ```
 
 It downloads the latest version, adds **Start menu + Desktop** shortcuts, then opens a quick **setup menu right in the terminal**: pick Claude or DeepSeek, paste your API key (hidden as you type), and add your name, your course, start-with-Windows and notetaker options. Then it launches MoodleClicky into your system tray. No Python and no admin rights needed.

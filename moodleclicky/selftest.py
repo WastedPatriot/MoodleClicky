@@ -192,6 +192,7 @@ def check_ui(report: list[str]) -> None:
     app._settings_win._save()
     report.append("ok    settings window opens and saves")
     if sys.platform == "win32":
+        report.append("...   keyboard checks (real key events)")
         check_keyboard(root, report)
     root.destroy()
 
@@ -219,15 +220,15 @@ def check_keyboard(root, report: list[str]) -> None:
             time.sleep(0.12)
         time.sleep(0.6)
 
-    with kb.pressed(Key.ctrl_r):  # Right Ctrl+C must NOT trigger
-        kb.press("c")
-        kb.release("c")
+    with kb.pressed(Key.ctrl_r):  # Ctrl used with another key (Ctrl+Shift here - harmless) must NOT trigger
+        kb.press(Key.shift)
+        kb.release(Key.shift)
     time.sleep(0.6)
     double_tap(Key.ctrl_l)  # Left Ctrl x2 is PowerToys Find My Mouse - must NOT trigger
     double_tap(Key.ctrl_r)  # Right Ctrl x2 = wake up
     trig.stop()
     check(fired == [1], f"double-tap Right Ctrl fired {len(fired)} times (want 1)")
-    report.append("ok    double-tap Right Ctrl wakes the buddy (Left Ctrl x2 and Ctrl+C don't)")
+    report.append("ok    double-tap Right Ctrl wakes the buddy (Left Ctrl x2 and Ctrl+other key don't)")
 
     win = tk.Toplevel(root)
     win.title("MoodleClicky self-test box")
@@ -259,23 +260,48 @@ def check_model(report: list[str]) -> None:
     report.append("ok    speech model loads and runs (tiny.en)")
 
 
+class Report(list):
+    """Lines are printed and saved as they happen, so a hang or crash still shows how far it got."""
+
+    def __init__(self, out: str | None):
+        super().__init__()
+        self.out = out
+
+    def append(self, line: str) -> None:
+        super().append(line)
+        if sys.stdout:
+            print(line, flush=True)
+        if self.out:
+            try:
+                Path(self.out).write_text("\n".join(self), encoding="utf-8")
+            except OSError:
+                pass
+
+
 def run(args: list[str]) -> int:
+    import threading
+
     out = next((a for a in args if not a.startswith("--")), None)
     os.environ.setdefault("MOODLECLICKY_HOME", tempfile.mkdtemp(prefix="mc-selftest-"))
-    report = [f"MoodleClicky self-test · python {sys.version.split()[0]} · frozen={getattr(sys, 'frozen', False)}"]
+    report = Report(out)
+    report.append(f"MoodleClicky self-test · python {sys.version.split()[0]} · frozen={getattr(sys, 'frozen', False)}")
+
+    def watchdog():  # never hang a build: give up loudly
+        report.append("RESULT: FAIL (self-test timed out - the last 'ok' line above shows how far it got)")
+        os._exit(3)
+
+    timer = threading.Timer(600 if "--with-model" in args else 240, watchdog)
+    timer.daemon = True
+    timer.start()
     ok = check_imports(report, set())
     for name, fn in (("ui", check_ui), ("model", check_model)):
         if name == "model" and "--with-model" not in args:
             continue
         try:
             fn(report)
-        except Exception:
+        except BaseException:  # incl. KeyboardInterrupt from a stray Ctrl+C in a console
             ok = False
             report.append(f"FAIL  {name}:\n{traceback.format_exc()}")
+    timer.cancel()
     report.append("RESULT: " + ("PASS" if ok else "FAIL"))
-    text = "\n".join(report)
-    if out:
-        Path(out).write_text(text, encoding="utf-8")
-    if sys.stdout:
-        print(text)
     return 0 if ok else 1

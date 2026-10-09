@@ -337,7 +337,9 @@ class App:
 
 
 def trigger_hint(s: Settings) -> str:
-    return {"double_ctrl": "Ctrl Ctrl", "right_ctrl": "Right Ctrl"}.get(s.trigger, "Ctrl+Alt+Space")
+    return {"double_rctrl": "Right Ctrl ×2", "double_ctrl": "Ctrl ×2", "triple_ctrl": "Ctrl ×3",
+            "right_ctrl": "Right Ctrl"}.get(
+        s.trigger, "Ctrl+Alt+Space")
 
 
 def tray_image(color: str):

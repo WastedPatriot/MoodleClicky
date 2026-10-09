@@ -126,7 +126,7 @@ def main(out=None):
     assert b.state == "showing", b.state  # never went through the "what are you stuck on?" prompt
     assert partials and partials[0].get("title"), partials
     assert b.type_box.winfo_ismapped() and "O(n^2)" in b.type_preview.cget("text")
-    assert "Ctrl Ctrl" in b.footer.cget("text")
+    assert "Right Ctrl ×2" in b.footer.cget("text")
 
     import moodleclicky.typer as typer
 

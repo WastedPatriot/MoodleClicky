@@ -321,3 +321,32 @@ def test_streaming_partials_and_type_text():
     assert seen and seen[0] == {"title": S["title"]}  # title arrives first, before the rest
     assert seen[-1]["type_text"] == "O(n^2)"
     assert len(seen) == len({json.dumps(x, sort_keys=True) for x in seen})  # only sent when something changed
+
+
+def test_trigger_modes_watch_the_right_keys():
+    from types import SimpleNamespace
+
+    from moodleclicky.triggers import KeyTrigger
+
+    kb = SimpleNamespace(Key=SimpleNamespace(ctrl="ctrl", ctrl_l="ctrl_l", ctrl_r="ctrl_r"))
+    rc = KeyTrigger("double_rctrl", lambda: None)
+    assert rc.tap.taps_needed == 2 and rc._is_watched("ctrl_r", kb)
+    assert not rc._is_watched("ctrl_l", kb) and not rc._is_watched("ctrl", kb)  # PowerToys Find My Mouse key
+    any_ctrl = KeyTrigger("double_ctrl", lambda: None)
+    assert all(any_ctrl._is_watched(k, kb) for k in ("ctrl", "ctrl_l", "ctrl_r"))
+    assert KeyTrigger("right_ctrl", lambda: None).tap.taps_needed == 1
+    assert KeyTrigger("triple_ctrl", lambda: None).tap.taps_needed == 3
+    assert Settings().trigger == "double_rctrl"
+
+
+def test_triple_tap():
+    from moodleclicky.triggers import DoubleTap
+
+    fired = []
+    clock = Clock()
+    d = DoubleTap(lambda: fired.append(1), taps=3, clock=clock)
+    tap(d, clock)
+    tap(d, clock)
+    assert fired == []  # two taps (PowerToys' shortcut) isn't enough
+    tap(d, clock)
+    assert fired == [1]

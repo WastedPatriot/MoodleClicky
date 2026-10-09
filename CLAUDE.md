@@ -26,7 +26,7 @@ the Clippy-style bubble pages through summary → steps → answer → why → c
 - `tools/build_windows.ps1` PyInstaller onedir build + exe self-test + zip (CI windows job, tags -> Release)
 
 ## Rules
-- Commit author: Claude <noreply@anthropic.com>. Lint: `ruff check .`, `bandit -r moodleclicky`.
+- Commit author: WastedPatriot <106580482+WastedPatriot@users.noreply.github.com> (owner's GitHub noreply). Lint: `ruff check .`, `bandit -r moodleclicky`.
 - Tests: `pytest -q` and `xvfb-run -a -s "-screen 0 1600x900x24" python tests/ui_smoke.py`. Keep green.
 - Tests never call the real API — use `tests/fakes.py` FakeClient.
 - Default model `claude-opus-5-5`, adaptive thinking, effort from settings, server-side fallbacks on.

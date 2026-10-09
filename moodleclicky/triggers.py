@@ -67,8 +67,9 @@ class KeyTrigger:
     """Global listener: 'double_rctrl' (Right Ctrl twice), 'double_ctrl' (either Ctrl twice) or
     'right_ctrl' (Right Ctrl once)."""
 
-    def __init__(self, mode: str, fire: Callable[[], None]):
+    def __init__(self, mode: str, fire: Callable[[], None], on_escape: Callable[[], None] | None = None):
         self.mode = mode
+        self.on_escape = on_escape
         self.tap = DoubleTap(fire, taps={"right_ctrl": 1, "triple_ctrl": 3}.get(mode, 2))
         self._listener = None
 
@@ -85,6 +86,8 @@ class KeyTrigger:
                 self.tap.watched_down()
             else:
                 self.tap.other_key()
+                if key == keyboard.Key.esc and self.on_escape:
+                    self.on_escape()
 
         def on_release(key):
             if self._is_watched(key, keyboard):

@@ -116,6 +116,20 @@ def check_ui(report: list[str]) -> None:
     app.bubble.close()
     report.append("ok    hotkey -> screenshot -> breakdown -> buddy points -> answer")
 
+    app.look_now()  # what a double-tap of Right Ctrl does: speech bubble, no card
+    for _ in range(500):
+        pump(root, 0.02)
+        if not app.busy and app.player.playing:
+            break
+    check(app.player.playing and app.speech.visible and app.bubble.state == "hidden",
+          f"speech bubble didn't play (playing={app.player.playing}, card={app.bubble.state})")
+    pump(root, 0.5)
+    w = app.speech.win.winfo_width()
+    check(60 <= w <= 330, f"speech bubble is {w}px wide")
+    app.dismiss()
+    check(not app.speech.visible, "Esc didn't hide the speech bubble")
+    report.append("ok    double-tap -> speech bubble talks it through (small, click-through), Esc hides")
+
     class Rec:
         def __init__(self, folder, on_chunk):
             self.folder, self.on_chunk, self.recorded_secs, self.level = Path(folder), on_chunk, 0.0, 0.0

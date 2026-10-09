@@ -17,6 +17,7 @@ from moodleclicky.bubble import Bubble, Page
 from moodleclicky.buddy import Buddy
 from moodleclicky.config import Settings, data_dir
 from moodleclicky.settings_ui import SettingsWindow
+from moodleclicky.speech import SpeechBubble, SpeechPlayer, plan_lines
 from moodleclicky.triggers import KeyTrigger
 from moodleclicky.winutil import SingleInstance, enable_dpi_awareness, focus_window, foreground_window, set_autostart
 
@@ -42,6 +43,13 @@ class App:
         self._return_focus = False  # quick-trigger looks hand the keyboard straight back to your box
 
         self.buddy = Buddy(root, settings.buddy_color)
+        self.speech = SpeechBubble(root, anchor=self.buddy.position, anchor_scale=lambda: self.buddy.scale)
+        self.player = SpeechPlayer(root, self.speech, point=self._point, on_finish=self._speech_done)
+        self.pending_type = ""  # suggestion that a double-tap would type right now
+        self.last_exp: Explanation | None = None
+        self._last_near: tuple[int, int] = (0, 0)
+        self._via_card = False  # True when the request came from the full card (prompt / follow-up)
+        self._said_summary = ""
         self.bubble = Bubble(
             root,
             on_ask=self.ask,
@@ -78,7 +86,7 @@ class App:
     # ---- actions -------------------------------------------------------
     def on_trigger(self) -> None:
         """Double-tap Ctrl (or your chosen trigger): type the suggestion if one is up, else look now."""
-        if self.bubble.state == "showing" and self.bubble.type_text:
+        if self._suggestion_up():
             self.type_suggestion()
         elif self.settings.instant:
             self.look_now()
@@ -94,21 +102,69 @@ class App:
             return
         self.target_hwnd = foreground_window()
         self._return_focus = True
+        self._via_card = False
+        self.buddy.set_active(True)  # grow straight away so you know it heard you
         self.ask("")
 
+    def _suggestion_up(self) -> bool:
+        """A double-tap types only while the suggestion is on screen (speech bubble or card)."""
+        if self.bubble.state == "showing" and self.bubble.type_text:
+            return True
+        return bool(self.pending_type) and self.speech.visible
+
     def type_suggestion(self) -> None:
-        text = self.bubble.type_text
+        text = self.bubble.type_text if self.bubble.state == "showing" and self.bubble.type_text else self.pending_type
         if not text:
             return
         from moodleclicky.typer import type_into
 
         try:
             type_into(self.root, self.target_hwnd, text, pause=self._pause_trigger)
-            self.bubble.footer.config(text="✓ Typed into your box. Ctrl+Z undoes it.")
+            msg = "✓ Typed into your box. Ctrl+Z undoes it."
+            self.bubble.footer.config(text=msg)
             self.bubble.set_type_text("")
+            self.pending_type = ""
+            if self.speech.visible:
+                self.player.stop(quiet=True)
+                self.speech.say(msg, instant=True)
+                self.player._job = self.root.after(2500, self.player.stop)
         except Exception as e:  # keyboard hook unavailable etc.
             log.exception("typing failed")
             self.bubble.footer.config(text=f"Couldn't type it ({e}) - it's on your clipboard instead.")
+
+    def dismiss(self) -> None:
+        """Esc: stop talking and tuck the buddy away."""
+        if self.player.playing or self.speech.visible:
+            self.player.stop()
+
+    def show_full_answer(self) -> None:
+        if self.last_exp is not None:
+            self.player.stop()
+            self._via_card = True
+            self.bubble.show_explanation(self.last_exp, self.buddy.position(), self.settings.open_on_answer,
+                                         "Full answer · Esc to close")
+
+    def _point(self, xy, label: str) -> None:
+        if xy:
+            self.buddy.point_at(xy, label)
+        else:
+            self.buddy.follow()
+
+    def _speech_done(self) -> None:
+        self.buddy.set_active(False)
+        self.buddy.follow()
+
+    def _compact(self) -> bool:
+        return self.settings.compact and not self._via_card
+
+    def _partial(self, f: dict) -> None:
+        if self._compact():
+            summary = f.get("summary", "")
+            if summary and summary != self._said_summary:
+                self._said_summary = summary
+                self.speech.say(summary, (f.get("title") or "")[:40].upper())
+        else:
+            self.bubble.show_partial(f)
 
     def _pause_trigger(self, on: bool) -> None:
         if self._trigger:
@@ -126,6 +182,7 @@ class App:
         self.buddy.follow()
         self.target_hwnd = foreground_window()
         self._return_focus = False  # the prompt needs the keyboard
+        self._via_card = True
         self.bubble.prompt(self.root.winfo_pointerxy())
 
     def ask(self, question: str) -> None:
@@ -135,11 +192,15 @@ class App:
         self.last_question = question
         cursor = self.root.winfo_pointerxy()
         # Hide our own windows so they aren't in the screenshot.
-        was_visible = self.bubble.state != "hidden" or self.buddy.visible
+        was_visible = self.bubble.state != "hidden" or self.buddy.visible or self.speech.visible
+        self.player.stop(quiet=True)
+        self.speech.hide()
+        self.pending_type = ""
+        self._said_summary = ""
         self.bubble.win.withdraw()
         self.buddy.win.withdraw()
         self.root.update()
-        partial = lambda f: self.call_soon(lambda: self.bubble.show_partial(f))  # noqa: E731
+        partial = lambda f: self.call_soon(lambda: self._partial(f))  # noqa: E731
 
         def work() -> None:
             try:
@@ -161,10 +222,11 @@ class App:
         self.busy = True
         self.last_question = text
         self._return_focus = False
+        self._via_card = True
         near = self.buddy.position()
         self._thinking(None)
 
-        partial = lambda f: self.call_soon(lambda: self.bubble.show_partial(f))  # noqa: E731
+        partial = lambda f: self.call_soon(lambda: self._partial(f))  # noqa: E731
 
         def work() -> None:
             exp = self.tutor.follow_up(text, self.mode, on_partial=partial)
@@ -226,7 +288,11 @@ class App:
             self.buddy.show()
         self.buddy.follow()
         self.buddy.set_thinking(True)
-        self.bubble.thinking(cursor)
+        self.buddy.set_active(True)
+        if self._compact():
+            self.speech.thinking()
+        else:
+            self.bubble.thinking(cursor)
         self._give_focus_back()
 
     def _give_focus_back(self) -> None:
@@ -248,7 +314,14 @@ class App:
                 pass
         if exp.type_text and not exp.error:
             footer = f"{trigger_hint(self.settings)} types the suggestion · " + footer
-        self.bubble.show_explanation(exp, near, self.settings.open_on_answer, footer)
+        self.last_exp, self._last_near = exp, near
+        self.pending_type = "" if exp.error else exp.type_text
+        if self._compact():
+            # Clicky-style: talk it through in the little speech bubble, then fade.
+            self.player.play(plan_lines(exp, trigger_hint(self.settings)))
+        else:
+            self.buddy.set_active(False)
+            self.bubble.show_explanation(exp, near, self.settings.open_on_answer, footer)
         self._give_focus_back()
 
     def _on_page(self, page: Page | None) -> None:
@@ -303,7 +376,8 @@ class App:
             self._trigger = None
             return
         try:
-            self._trigger = KeyTrigger(self.settings.trigger, lambda: self.call_soon(self.on_trigger))
+            self._trigger = KeyTrigger(self.settings.trigger, lambda: self.call_soon(self.on_trigger),
+                                       on_escape=lambda: self.call_soon(self.dismiss))
             self._trigger.start()
         except Exception:  # no keyboard hook available
             log.exception("double-tap trigger disabled")
@@ -321,6 +395,7 @@ class App:
                  checked=lambda _i: self.settings.buddy_visible),
             item("Look at my screen now", lambda: self.call_soon(self.look_now)),
             item("Ask a question…", lambda: self.call_soon(self.start_prompt)),
+            item("Show full answer", lambda: self.call_soon(self.show_full_answer)),
             item("Lecture / meeting notetaker…", lambda: self.call_soon(self.open_notetaker)),
             item("Settings…", lambda: self.call_soon(self.open_settings)),
             item("Open revision notes", lambda: self.call_soon(self.open_notes)),

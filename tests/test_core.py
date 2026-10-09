@@ -401,3 +401,21 @@ def test_looks_blind_only_on_real_failures():
 def test_claude_blind_reply_is_a_friendly_error():
     exp = Tutor(Settings(), client=FakeClient(payload=BLIND)).ask(make_shot(), "", "breakdown")
     assert "couldn't see your screen" in exp.error
+
+
+def test_speech_plan_lines():
+    from moodleclicky.brain import parse_explanation
+    from moodleclicky.speech import MAX_CHARS, plain, plan_lines
+
+    exp = parse_explanation(json.dumps(dict(SAMPLE, type_text="O(n^2)")), make_shot())
+    lines = plan_lines(exp, "Right Ctrl ×2")
+    tags = [ln.tag for ln in lines]
+    assert tags[1:4] == ["1 / 3", "2 / 3", "3 / 3"] and "ANSWER" in tags and "WHY" in tags
+    assert lines[1].point == exp.steps[0].point and lines[3].point is None
+    assert lines[-1].hold and lines[-1].text.startswith("Right Ctrl ×2 to type it")
+    answer = next(ln for ln in lines if ln.tag == "ANSWER")
+    assert "```" not in answer.text and "for i in range(n):" in answer.text  # code fences stripped
+    assert all(2.5 <= ln.secs <= 12 for ln in lines if not ln.hold)
+    assert len(plain("word " * 200)) <= MAX_CHARS + 1
+    err = plan_lines(parse_explanation(json.dumps(SAMPLE), None).__class__.failed("No key"))
+    assert len(err) == 1 and err[0].tag == "HMM"

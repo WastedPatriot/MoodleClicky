@@ -1,6 +1,6 @@
 # MoodleClicky
 
-**A study buddy that lives next to your mouse cursor.** Stuck on a Moodle question, a coursework task or an error in your code? **Double-tap Right Ctrl.** MoodleClicky looks at your screen, flies over to the right spot, and walks you through it one small step at a time in a Clippy-style pop-up. No chatbot wall of text, and no pressing Enter. If you're typing in a box, it suggests what goes there. **Double-tap Right Ctrl again** and it types it in for you.
+**A study buddy that lives next to your mouse cursor.** Stuck on a Moodle question, a coursework task or an error in your code? **Double-tap Right Ctrl.** MoodleClicky looks at your screen, flies over to the right spot, and talks you through it one small step at a time in a **little speech bubble** right next to it. No chatbot window, no big pop-up, no pressing Enter. If you're typing in a box, it suggests what goes there. **Double-tap Right Ctrl again** and it types it in for you.
 
 ![MoodleClicky demo](docs/demo.gif)
 
@@ -53,7 +53,20 @@ Install **Python 3.11+** from [python.org](https://www.python.org/downloads/) (t
 
 **Why Right Ctrl?** Tapping Ctrl on its own does nothing in browsers, Word or code editors, so it never gets in the way. Ctrl+C, Ctrl+V, Ctrl+click and holding Ctrl don't count. It's the **Right** Ctrl because double-tapping *Left* Ctrl is PowerToys' **Find My Mouse** spotlight. Prefer something else? Settings → **Wake-up key**: either Ctrl ×2, Right Ctrl ×1, or the classic Ctrl+Alt+Space.
 
-The pop-up doesn't steal your keyboard. Your cursor stays in the box you were typing in, so you can keep going.
+### 💬 Speech bubble
+
+The answer arrives Clicky-style:
+- **A small speech bubble** sits right beside the cursor buddy and types itself out.
+- **The buddy grows** while it's thinking and talking, so you can see it, then shrinks back.
+- **It walks you through it:** what the question is asking, then each step (the buddy flies to the bit of the screen it's talking about), then the answer and why.
+- **Then it fades away** on its own.
+
+It never gets in the way:
+- **Clicks go straight through** the bubble and the buddy.
+- **Your cursor stays in the box you were typing in.**
+- **Esc** hides it.
+
+Want the whole thing at once, with Back/Next and follow-up questions? Tray icon → **Show full answer**, or turn off *Speech bubble* in Settings for the big card.
 
 ### ✍ Typing help
 
@@ -82,7 +95,7 @@ Switch modes in the pop-up at any time. You can also type follow-up questions ("
 
 ## Screenshots
 
-| Pointing at the code | The answer, with a breakdown |
+| Speech bubble: talking you through it | Full answer (tray → Show full answer) |
 |---|---|
 | ![Pointing](docs/pointing.png) | ![Answer](docs/answer.png) |
 | **Hint mode: no spoilers** | **Ask anything** |

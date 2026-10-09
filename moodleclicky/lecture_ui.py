@@ -9,7 +9,7 @@ from collections.abc import Callable
 from datetime import datetime
 
 from moodleclicky import theme as t
-from moodleclicky.brain import APIProblem
+from moodleclicky.brain import APIProblem, has_key
 from moodleclicky.config import Settings
 from moodleclicky.lecture import summarise
 from moodleclicky.lecture.session import Session, recent_sessions
@@ -216,6 +216,9 @@ class NotetakerWindow:
     # ---- AI helpers ----------------------------------------------------
     def _run_ai(self, msg: str, job: Callable[[], dict], done: Callable[[dict], None]) -> None:
         if self.busy:
+            return
+        if not has_key(self.settings) and self.session_factory is Session:
+            self._say("Add your Claude or DeepSeek API key in Settings first (tray icon → Settings).")
             return
         self.busy = True
         self._say(msg)

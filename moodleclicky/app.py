@@ -284,7 +284,17 @@ def setup_logging() -> None:
     threading.excepthook = lambda a: hook(a.exc_type, a.exc_value, a.exc_traceback)
 
 
+def _ensure_std_streams() -> None:
+    """A windowed .exe has no console: sys.stdout/stderr are None and libraries that print (e.g. the
+    speech-model download progress bar) would crash. Point them at devnull instead."""
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))  # noqa: SIM115 - lives for the process
+
+
 def main() -> None:
+    _ensure_std_streams()
     if "--selftest" in sys.argv:
         from moodleclicky.selftest import run
 

@@ -9,21 +9,34 @@
 
 ---
 
-## Quick start (Windows)
+## Install (Windows), one command
 
-**Option A: ready-made app (no Python needed)**
+Open **PowerShell** (Start → type *PowerShell* → Enter) and paste:
 
-1. Open the **Actions** tab, then the latest green **CI** run, then download **MoodleClicky-windows**. Or grab it from **Releases**.
-2. Unzip it anywhere (e.g. `Documents\MoodleClicky`).
-3. Double-click **`MoodleClicky.exe`**.
-4. Paste your API key in the settings window: a [Claude key](https://console.anthropic.com) or a [DeepSeek key](https://platform.deepseek.com).
-5. Hover over a question and press **Ctrl + Alt + Space**.
+```powershell
+irm https://raw.githubusercontent.com/WastedPatriot/moodleclicky/main/install.ps1 | iex
+```
 
-**Option B: from source**
+It downloads the latest version, adds **Start menu + Desktop** shortcuts, then opens a quick **setup menu right in the terminal**: pick Claude or DeepSeek, paste your API key (hidden as you type), and add your name, your course, start-with-Windows and notetaker options. Then it launches MoodleClicky into your system tray. No Python and no admin rights needed.
+
+| I want to… | Do this |
+|---|---|
+| **Update** to the newest version | Run the same command again. Your settings, keys and notes are kept |
+| **Change settings** later | Start menu → **MoodleClicky Setup**, or tray icon → Settings |
+| **Uninstall** | Start menu → **Uninstall MoodleClicky**. It asks whether to keep your notes |
+| Install from a zip you already downloaded | `.\install.ps1 -Zip C:\path\to\MoodleClicky-windows.zip` |
+
+**Got an older copy you downloaded by hand?**
+1. Right-click the tray icon (bottom-right, by the clock) and choose **Quit**.
+2. Delete the folder you unzipped it into.
+3. Run the install command above.
+
+If you'd turned on *Start with Windows*, the new install takes that over automatically.
+
+<details><summary>Run from source instead (for tinkering)</summary>
 
 Install **Python 3.11+** from [python.org](https://www.python.org/downloads/) (tick *"Add python.exe to PATH"*). Download this repo, then double-click **`run.bat`**. The first run sets everything up.
-
-The buddy then sits in your system tray. Click the tray icon to show or hide it. Turn on **Start with Windows** in Settings and it's always there.
+</details>
 
 ## Hotkeys
 

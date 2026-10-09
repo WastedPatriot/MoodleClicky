@@ -25,6 +25,8 @@ jobs:
 
   windows:
     runs-on: windows-latest
+    permissions:
+      contents: write  # publish Releases on v* tags
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -40,6 +42,29 @@ jobs:
       - name: Build MoodleClicky.exe + self-test the build
         shell: pwsh
         run: ./tools/build_windows.ps1
+      - name: Installer test (install from the built zip, setup menu, launch, uninstall)
+        shell: pwsh
+        run: |
+          "1`nsk-ant-ci-not-a-real-key`nCI`nTest course`nn`ny`ny`n1`n" | pwsh -NoProfile -File install.ps1 -Zip dist/MoodleClicky-windows.zip
+          $dir = Join-Path $env:LOCALAPPDATA "Programs\MoodleClicky"
+          if (-not (Test-Path "$dir\MoodleClicky.exe")) { throw "exe not installed" }
+          foreach ($l in "MoodleClicky.lnk", "MoodleClicky Setup.lnk", "Uninstall MoodleClicky.lnk") {
+            if (-not (Test-Path (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\$l"))) { throw "missing shortcut $l" }
+          }
+          Get-Content (Join-Path $env:APPDATA "MoodleClicky\setup.log")
+          $cfg = Get-Content (Join-Path $env:APPDATA "MoodleClicky\config.json") -Raw | ConvertFrom-Json
+          if ($cfg.your_name -ne "CI" -or $cfg.whisper_model -ne "tiny.en") { throw "setup answers not saved" }
+          Start-Sleep -Seconds 8
+          if (-not (Get-Process MoodleClicky -ErrorAction SilentlyContinue)) {
+            Get-Content (Join-Path $env:APPDATA "MoodleClicky\moodleclicky.log") -ErrorAction SilentlyContinue
+            throw "installed app didn't stay running"
+          }
+          Write-Host "Installed app is running."
+          "y`n`n" | pwsh -NoProfile -File install.ps1 -Uninstall
+          Start-Sleep -Seconds 5
+          if (Test-Path $dir) { throw "app folder not removed" }
+          if (Test-Path (Join-Path $env:APPDATA "MoodleClicky")) { throw "data not removed" }
+          Write-Host "Install / setup / launch / uninstall OK"
       - uses: actions/upload-artifact@v4
         with:
           name: MoodleClicky-windows

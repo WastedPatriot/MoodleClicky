@@ -295,6 +295,10 @@ def _ensure_std_streams() -> None:
 
 def main() -> None:
     _ensure_std_streams()
+    if "--apply-setup" in sys.argv:  # called by install.ps1 after its setup menu
+        from moodleclicky.setup_cli import main as apply_main
+
+        sys.exit(apply_main())
     if "--selftest" in sys.argv:
         from moodleclicky.selftest import run
 

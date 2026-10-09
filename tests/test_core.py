@@ -350,3 +350,54 @@ def test_triple_tap():
     assert fired == []  # two taps (PowerToys' shortcut) isn't enough
     tap(d, clock)
     assert fired == [1]
+
+
+class SeqDeepSeek:
+    """Returns the given replies in order (each a dict payload for the JSON content)."""
+
+    def __init__(self, *replies):
+        self.replies = list(replies)
+        self.payloads = []
+
+    def chat(self, payload):
+        self.payloads.append(json.loads(json.dumps(payload)))
+        content = self.replies.pop(0)
+        return {"choices": [{"message": {"content": json.dumps(content)}, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 10}}
+
+
+BLIND = dict(SAMPLE, title="Unable to see question",
+             summary="I can't see the screenshot - it appears as unsupported. Please describe what's at your cursor.")
+
+
+def test_deepseek_retries_when_it_cant_see_the_screenshot():
+    fake = SeqDeepSeek(BLIND, SAMPLE)
+    exp = Tutor(Settings(provider="deepseek", deepseek_model="deepseek-v4-pro"), deepseek_client=fake).ask(
+        make_shot(), "", "breakdown")
+    assert not exp.error and exp.title == SAMPLE["title"]
+    first, second = fake.payloads
+    assert first["model"] == "deepseek-flash"  # v4-pro can't see images -> swapped for screenshots
+    assert first["messages"][1]["content"][0]["type"] == "image_url"
+    assert second["messages"][1]["content"][0]["type"] == "file"  # the other documented image format
+    assert second["messages"][1]["content"][0]["file_data"].startswith("data:image/jpeg;base64,")
+    assert second["thinking"] == {"type": "disabled"} and "reasoning_effort" not in second
+
+
+def test_deepseek_still_blind_gives_clear_advice():
+    exp = Tutor(Settings(provider="deepseek"), deepseek_client=SeqDeepSeek(BLIND, BLIND)).ask(
+        make_shot(), "", "breakdown")
+    assert "Switch to Claude" in exp.error
+
+
+def test_looks_blind_only_on_real_failures():
+    from moodleclicky.brain import looks_blind
+
+    assert looks_blind(json.dumps(BLIND))
+    assert not looks_blind(json.dumps(SAMPLE))
+    normal = dict(SAMPLE, summary="The screenshot shows a SQL query; you need to describe what JOIN does.")
+    assert not looks_blind(json.dumps(normal))
+
+
+def test_claude_blind_reply_is_a_friendly_error():
+    exp = Tutor(Settings(), client=FakeClient(payload=BLIND)).ask(make_shot(), "", "breakdown")
+    assert "couldn't see your screen" in exp.error

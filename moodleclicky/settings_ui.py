@@ -47,9 +47,39 @@ class SettingsWindow:
         t.PillButton(bar, "Cancel", w.destroy, kind="ghost").pack(side="right", padx=6)
         t.PillButton(bar, "Open notes folder", open_notes).pack(side="left")
 
-        scroll = t.ScrollFrame(outer, max_height=min(620, w.winfo_screenheight() - 220))
+        # Fit any screen: the scroll area gets whatever the window leaves after the header and buttons.
+        win_h = min(780, w.winfo_screenheight() - 90)
+        scroll = t.ScrollFrame(outer, max_height=win_h - 150)
         scroll.pack(fill="both", expand=True)
         body = scroll.body
+
+        # -- AI provider
+        a = t.Card(body, "AI provider", "Use your own key. Each answer shows roughly what it cost.")
+        a.pack(fill="x", pady=(0, 10))
+        if not get_api_key(s.provider):
+            tk.Label(a.body, text="👋  Paste a Claude or DeepSeek API key below to get started, then press Save.",
+                     bg=t.ACCENT_LO, fg=t.INK, font=f.small, anchor="w", justify="left", wraplength=420,
+                     padx=10, pady=8).pack(fill="x", pady=(0, 12))
+        self.provider = tk.StringVar(w, s.provider)
+        t.Segmented(a.body, [("anthropic", "Claude"), ("deepseek", "DeepSeek")], variable=self.provider,
+                    command=lambda _v: self._show_provider()).pack(anchor="w", pady=(0, 12))
+        self.keys = {p: tk.StringVar(w, get_api_key(p)) for p in ("anthropic", "deepseek")}
+        self.models = {"anthropic": tk.StringVar(w, s.model), "deepseek": tk.StringVar(w, s.deepseek_model)}
+        self.provider_frames = {}
+        for p, label in (("anthropic", "Claude"), ("deepseek", "DeepSeek")):
+            fr = tk.Frame(a.body, bg=t.CARD)
+            t.form_row(fr, f"{label} API key", lambda par, p=p: t.Field(par, self.keys[p], show="•", eye=True,
+                                                                        placeholder="paste your key"),
+                       hint=KEY_HINTS[p])
+            options = [m for m in PRICES if m.startswith("claude" if p == "anthropic" else "deepseek")]
+            t.form_row(fr, "Model", lambda par, p=p, o=options: t.combobox(par, self.models[p], o),
+                       hint=f"Default: {DEFAULT_MODELS[p]}")
+            self.provider_frames[p] = fr
+        self.effort = tk.StringVar(w, s.effort)
+        self.effort_row = t.form_row(a.body, "Thinking effort", lambda p: t.Segmented(
+            p, [(e, e.capitalize()) for e in EFFORTS], variable=self.effort),
+            hint="Higher = more careful, slower, a bit pricier.", pady=(4, 0))
+        self._show_provider()
 
         # -- General
         g = t.Card(body, "General", "How the buddy behaves.")
@@ -73,30 +103,6 @@ class SettingsWindow:
         self.autostart = tk.BooleanVar(w, s.start_with_windows)
         t.Toggle(g.body, self.autostart, "Start with Windows", "Sits quietly in the tray after you log in").pack(
             fill="x")
-
-        # -- AI provider
-        a = t.Card(body, "AI provider", "Use your own key. Each answer shows roughly what it cost.")
-        a.pack(fill="x", pady=(0, 10))
-        self.provider = tk.StringVar(w, s.provider)
-        t.Segmented(a.body, [("anthropic", "Claude"), ("deepseek", "DeepSeek")], variable=self.provider,
-                    command=lambda _v: self._show_provider()).pack(anchor="w", pady=(0, 12))
-        self.keys = {p: tk.StringVar(w, get_api_key(p)) for p in ("anthropic", "deepseek")}
-        self.models = {"anthropic": tk.StringVar(w, s.model), "deepseek": tk.StringVar(w, s.deepseek_model)}
-        self.provider_frames = {}
-        for p, label in (("anthropic", "Claude"), ("deepseek", "DeepSeek")):
-            fr = tk.Frame(a.body, bg=t.CARD)
-            t.form_row(fr, f"{label} API key", lambda par, p=p: t.Field(par, self.keys[p], show="•", eye=True,
-                                                                        placeholder="paste your key"),
-                       hint=KEY_HINTS[p])
-            options = [m for m in PRICES if m.startswith("claude" if p == "anthropic" else "deepseek")]
-            t.form_row(fr, "Model", lambda par, p=p, o=options: t.combobox(par, self.models[p], o),
-                       hint=f"Default: {DEFAULT_MODELS[p]}")
-            self.provider_frames[p] = fr
-        self.effort = tk.StringVar(w, s.effort)
-        self.effort_row = t.form_row(a.body, "Thinking effort", lambda p: t.Segmented(
-            p, [(e, e.capitalize()) for e in EFFORTS], variable=self.effort),
-            hint="Higher = more careful, slower, a bit pricier.", pady=(4, 0))
-        self._show_provider()
 
         # -- Notetaker
         n = t.Card(body, "Lecture notetaker", "Records, transcribes on this PC, then the AI makes notes.")
@@ -133,7 +139,9 @@ class SettingsWindow:
 
         w.bind("<Escape>", lambda _e: w.destroy())
         w.update_idletasks()
-        w.geometry(f"520x{min(780, w.winfo_screenheight() - 80)}")
+        w.geometry(f"540x{win_h}+{max(0, (w.winfo_screenwidth() - 540) // 2)}+20")
+        w.minsize(460, 360)
+        self.scroll = scroll
         w.focus_force()
 
     def _show_provider(self) -> None:

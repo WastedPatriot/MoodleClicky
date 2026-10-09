@@ -82,7 +82,22 @@ def main(out=None):
     assert app.buddy.visible
 
     app.open_settings()
-    pump(root, 0.2)
+    pump(root, 0.3)
+    sw = app._settings_win
+    # The API key section is first, and the wheel scrolls even over a widget deep inside a card.
+    first_card = sw.scroll.body.winfo_children()[0]
+    assert "AI provider" in [w.cget("text") for w in first_card.winfo_children()[0].winfo_children()]
+    assert sw.scroll.can_scroll(), "settings should be taller than its window (else this test proves nothing)"
+    if sw.scroll.can_scroll():
+        target = sw.scroll.body.winfo_children()[1].winfo_children()[-1]  # deep inside the 2nd card
+        before = sw.scroll.canvas.yview()[0]
+        target.event_generate("<MouseWheel>", delta=-120)
+        pump(root, 0.1)
+        assert sw.scroll.canvas.yview()[0] > before, "mouse wheel didn't scroll settings"
+        sw.scroll.canvas.yview_moveto(1.0)
+        pump(root, 0.1)
+        assert sw.scroll.canvas.yview()[1] >= 0.999, "can't reach the bottom of settings"
+        print("settings scroll OK")
     app._settings_win.mode.set("Hint — nudge me, no answer")
     app._settings_win._save()
     assert app.mode == "hint" and Settings.load().mode == "hint"

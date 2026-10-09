@@ -680,18 +680,24 @@ def style_text(text: tk.Text, bg: str = CARD, fg: str = INK) -> tk.Text:
 
 
 class ScrollFrame(tk.Frame):
-    """A vertically scrolling container; put children in `.body`. Mouse wheel scrolls while hovered."""
+    """A vertically scrolling container; put children in `.body`.
+
+    The scrollbar is always there (so it can't get squeezed out), and the mouse wheel works anywhere in
+    the window - the binding sits on the toplevel, which every child widget's events pass through.
+    """
 
     def __init__(self, parent: tk.Misc, bg: str | None = None, max_height: int | None = None):
         bg = bg or _bg_of(parent)
         super().__init__(parent, bg=bg)
-        self.canvas = tk.Canvas(self, bg=bg, highlightthickness=0, bd=0)
-        self.bar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview, style="MC.Vertical.TScrollbar")
+        self._max_h = max_height
+        self.bar = ttk.Scrollbar(self, orient="vertical", style="MC.Vertical.TScrollbar")
+        self.bar.pack(side="right", fill="y", padx=(6, 0))  # packed first: always gets its space
+        self.canvas = tk.Canvas(self, bg=bg, highlightthickness=0, bd=0, yscrollincrement=24)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.bar.configure(command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.bar.set)
         self.body = tk.Frame(self.canvas, bg=bg)
         self._win = self.canvas.create_window(0, 0, window=self.body, anchor="nw")
-        self.canvas.configure(yscrollcommand=self.bar.set)
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self._max_h = max_height
         self.body.bind("<Configure>", self._on_body)
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(self._win, width=e.width))
         self.bind_all_wheel()
@@ -700,21 +706,31 @@ class ScrollFrame(tk.Frame):
         bw, bh = self.body.winfo_reqwidth(), self.body.winfo_reqheight()
         self.canvas.configure(scrollregion=(0, 0, bw, bh), width=bw,
                               height=min(bh, self._max_h) if self._max_h else bh)
-        if self._max_h and bh > self._max_h:
-            self.bar.pack(side="right", fill="y")
-        else:
-            self.bar.pack_forget()
+
+    def can_scroll(self) -> bool:
+        return self.body.winfo_reqheight() > max(1, self.canvas.winfo_height())
+
+    def scroll_to(self, widget: tk.Misc) -> None:
+        """Scroll so `widget` (anything inside .body) is at the top."""
+        self.update_idletasks()
+        y = widget.winfo_rooty() - self.body.winfo_rooty()
+        total = max(1, self.body.winfo_reqheight())
+        self.canvas.yview_moveto(max(0.0, min(1.0, y / total)))
 
     def bind_all_wheel(self) -> None:
         def wheel(e):
-            if self.bar.winfo_ismapped():
-                step = -1 if (getattr(e, "delta", 0) > 0 or getattr(e, "num", 0) == 4) else 1
-                self.canvas.yview_scroll(step * 3, "units")
+            if not self.winfo_exists() or not self.can_scroll():
+                return None
+            if str(e.widget).endswith("popdown.f.l") or e.widget.winfo_class() == "TCombobox":
+                return None  # let dropdowns use the wheel themselves
+            if getattr(e, "num", 0) in (4, 5):
+                step = -1 if e.num == 4 else 1
+            else:
+                d = getattr(e, "delta", 0)
+                step = -max(1, abs(d) // 120) if d > 0 else max(1, abs(d) // 120)
+            self.canvas.yview_scroll(step * 2, "units")
+            return "break"
 
+        top = self.winfo_toplevel()
         for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
-            self.canvas.bind(seq, wheel)
-            self.body.bind(seq, wheel)
-        self.bind("<Enter>", lambda _e: [self.bind_all(s, wheel) for s in ("<MouseWheel>", "<Button-4>",
-                                                                             "<Button-5>")])
-        self.bind("<Leave>", lambda _e: [self.unbind_all(s) for s in ("<MouseWheel>", "<Button-4>",
-                                                                       "<Button-5>")])
+            top.bind(seq, wheel, add="+")

@@ -29,6 +29,8 @@ jobs:
       contents: write  # publish Releases on v* tags
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -72,13 +74,29 @@ jobs:
         with:
           name: MoodleClicky-windows
           path: dist/MoodleClicky-windows.zip
+      - name: Remove releases whose tags aren't on main (after a history rewrite)
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --tags --force origin
+          foreach ($tag in (git tag --list "v*")) {
+            git merge-base --is-ancestor $tag origin/main
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Removing release + tag $tag (not on main any more)"
+              gh release delete $tag --yes --cleanup-tag 2>$null
+              if ($LASTEXITCODE -ne 0) { git push origin ":refs/tags/$tag" }
+            }
+          }
+          $global:LASTEXITCODE = 0
       - name: Read version
         id: ver
         shell: pwsh
         run: |
           $v = python -c "import moodleclicky; print(moodleclicky.__version__)"
           "version=$v" >> $env:GITHUB_OUTPUT
-          python tools/release_notes.py $v | Out-File -Encoding utf8 dist/release_notes.md
+          python tools/release_notes.py $v dist/release_notes.md
       - name: Publish release (main branch and v* tags) - this is what install.ps1 downloads
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2

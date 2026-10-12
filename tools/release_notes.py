@@ -23,6 +23,11 @@ def section(changelog: str, version: str) -> str:
 
 
 if __name__ == "__main__":
+    # usage: release_notes.py VERSION [OUT_FILE]  (writes UTF-8 itself: Windows consoles choke on arrows)
     version = sys.argv[1].lstrip("v")
     text = Path(__file__).resolve().parents[1].joinpath("CHANGELOG.md").read_text(encoding="utf-8")
-    print((section(text, version) or "Bug fixes and improvements.") + "\n" + INSTALL)
+    notes = (section(text, version) or "Bug fixes and improvements.") + "\n" + INSTALL
+    if len(sys.argv) > 2:
+        Path(sys.argv[2]).write_text(notes, encoding="utf-8")
+    else:
+        sys.stdout.buffer.write(notes.encode("utf-8"))

@@ -91,6 +91,10 @@ class SettingsWindow:
             hint="Tapping Ctrl on its own does nothing in browsers or Word, and Ctrl+C / Ctrl+V don't count. "
                  "Press it again to type a suggestion into your box. Right Ctrl avoids PowerToys' Find My Mouse "
                  "(Left Ctrl ×2).")
+        self.voice = tk.BooleanVar(w, s.voice)
+        t.Toggle(g.body, self.voice, "Hold Right Ctrl to talk",
+                 "Hold the wake-up key, ask out loud, let go. Speech is turned into text on this PC.").pack(
+            fill="x", pady=(0, 10))
         self.instant = tk.BooleanVar(w, s.instant)
         t.Toggle(g.body, self.instant, "Look straight away", "Off = ask \"what are you stuck on?\" first").pack(
             fill="x", pady=(0, 10))
@@ -171,6 +175,7 @@ class SettingsWindow:
         s.buddy_visible = self.visible.get()
         s.trigger = {v: k for k, v in TRIGGER_LABELS.items()}.get(self.trigger.get(), "double_rctrl")
         s.instant = self.instant.get()
+        s.voice = self.voice.get()
         s.compact = self.compact.get()
         label_to_mode = {v: k for k, v in MODE_LABELS.items()}
         s.mode = label_to_mode.get(self.mode.get(), "breakdown")

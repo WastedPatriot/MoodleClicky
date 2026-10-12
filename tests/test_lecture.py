@@ -226,3 +226,17 @@ def test_real_whisper_transcribes_speech(tmp_path):
     text = " ".join(s.text.lower() for s in segs)
     assert segs and segs[0].start >= 120
     assert "morning" in text and "everyone" in text
+
+
+@pytest.mark.skipif(not shutil.which("espeak-ng") or os.environ.get("MC_SKIP_WHISPER") == "1",
+                    reason="needs espeak-ng to synthesise speech")
+def test_push_to_talk_question_is_understood(tmp_path):
+    pytest.importorskip("faster_whisper")
+    from moodleclicky.lecture.transcribe import WhisperTranscriber
+    from moodleclicky.voice import transcribe_question
+
+    wav = tmp_path / "q.wav"
+    subprocess.run(["espeak-ng", "-s", "150", "-w", str(wav),  # nosec B603 B607
+                    "Why is the answer quadratic?"], check=True)
+    text = transcribe_question(WhisperTranscriber("tiny.en"), read_wav(wav)).lower()
+    assert "why" in text and "answer" in text, text

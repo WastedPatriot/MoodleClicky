@@ -17,7 +17,7 @@ from moodleclicky.bubble import Bubble, Page
 from moodleclicky.buddy import Buddy
 from moodleclicky.config import Settings, data_dir
 from moodleclicky.settings_ui import SettingsWindow
-from moodleclicky.speech import SpeechBubble, SpeechPlayer, plan_lines
+from moodleclicky.speech import QuickAsk, SpeechBubble, SpeechPlayer, plan_lines
 from moodleclicky.triggers import KeyTrigger
 from moodleclicky.winutil import SingleInstance, enable_dpi_awareness, focus_window, foreground_window, set_autostart
 
@@ -51,6 +51,11 @@ class App:
         self._via_card = False  # True when the request came from the full card (prompt / follow-up)
         self._said_summary = ""
         self.update_tag: str | None = None  # newer release found on GitHub
+        self.quick = QuickAsk(root, on_submit=self._quick_submit, on_cancel=self._quick_cancel)
+        self._listening = False
+        self._heard_text = ""
+        self._voice_rec = None  # VoiceRecorder, made on first use
+        self._voice_tx = None  # Whisper model for push-to-talk, loaded in the background
         self.bubble = Bubble(
             root,
             on_ask=self.ask,
@@ -182,9 +187,113 @@ class App:
             self.buddy.show()
         self.buddy.follow()
         self.target_hwnd = foreground_window()
+        if self.settings.compact:  # small one-line box by the buddy, answer in the speech bubble
+            self._return_focus = True
+            self._via_card = False
+            self.player.stop(quiet=True)
+            self.speech.hide()
+            self.buddy.set_active(True)
+            self.quick.open(self.buddy.position())
+            return
         self._return_focus = False  # the prompt needs the keyboard
         self._via_card = True
         self.bubble.prompt(self.root.winfo_pointerxy())
+
+    def _quick_submit(self, text: str) -> None:
+        self._via_card = False
+        self._return_focus = True
+        self.ask(text)
+
+    def _quick_cancel(self) -> None:
+        self.buddy.set_active(False)
+        if self.target_hwnd:
+            focus_window(self.target_hwnd)
+
+    # ---- push-to-talk ------------------------------------------------------
+    def voice_transcriber(self):
+        if self._voice_tx is None:
+            from moodleclicky.lecture.transcribe import WhisperTranscriber
+
+            self._voice_tx = WhisperTranscriber(self.settings.voice_model)
+        return self._voice_tx
+
+    def preload_voice(self) -> None:
+        """Load the speech model quietly in the background so the first question isn't slow."""
+        if not self.settings.voice:
+            return
+
+        def work():
+            try:
+                self.voice_transcriber().load()
+            except Exception:  # offline on first run etc. - we'll try again when it's used
+                log.exception("couldn't preload the push-to-talk speech model")
+
+        threading.Thread(target=work, name="voice-preload", daemon=True).start()
+
+    def listen_start(self) -> None:
+        if self.busy or self._listening or not self.settings.voice:
+            return
+        if not self.tutor.ready:
+            self.open_settings()
+            return
+        from moodleclicky.voice import VoiceRecorder
+
+        self.target_hwnd = foreground_window()
+        self.quick.close()
+        self.player.stop(quiet=True)
+        self.buddy.set_active(True)
+        if self.settings.buddy_visible:
+            self.buddy.show()
+        self.speech.say("Listening... let go when you're done.", "🎙  LISTENING", instant=True)
+        self._voice_rec = self._voice_rec or VoiceRecorder()
+        self._voice_rec.start()
+        self._listening = True
+
+    def listen_cancel(self) -> None:
+        if not self._listening:
+            return
+        self._listening = False
+        self._voice_rec.stop()
+        self.speech.hide()
+        self.buddy.set_active(False)
+
+    def listen_stop(self) -> None:
+        if not self._listening:
+            return
+        self._listening = False
+        audio = self._voice_rec.stop()
+        if self._voice_rec.error:
+            self._say_briefly(f"Couldn't use the microphone ({self._voice_rec.error}).", "🎙")
+            return
+        loaded = self._voice_tx is not None and getattr(self._voice_tx, "_model", None) is not None
+        self.speech.thinking("Got it" if loaded else "Getting speech ready (first time only)")
+        from moodleclicky.voice import transcribe_question
+
+        def work():
+            try:
+                text = transcribe_question(self.voice_transcriber(), audio, self.settings.course_context)
+            except Exception as e:
+                log.exception("push-to-talk transcription failed")
+                msg = f"Couldn't understand the audio ({e})."
+                self.call_soon(lambda: self._say_briefly(msg, "🎙"))
+                return
+            self.call_soon(lambda: self._heard(text))
+
+        threading.Thread(target=work, name="voice-transcribe", daemon=True).start()
+
+    def _heard(self, text: str) -> None:
+        if not text:
+            self._say_briefly("Didn't catch that. Hold Right Ctrl and try again.", "🎙")
+            return
+        self._heard_text = text
+        self._via_card = False
+        self._return_focus = True
+        self.ask(text)
+
+    def _say_briefly(self, text: str, tag: str = "") -> None:
+        self.player.stop(quiet=True)
+        self.speech.say(text, tag, instant=True)
+        self.player._job = self.root.after(4000, self.player.stop)
 
     def ask(self, question: str) -> None:
         if self.busy:
@@ -331,7 +440,8 @@ class App:
         self.buddy.set_thinking(True)
         self.buddy.set_active(True)
         if self._compact():
-            self.speech.thinking()
+            heard, self._heard_text = self._heard_text, ""
+            self.speech.thinking(f"“{heard}” - having a look" if heard else "Having a look")
         else:
             self.bubble.thinking(cursor)
         self._give_focus_back()
@@ -417,8 +527,13 @@ class App:
             self._trigger = None
             return
         try:
-            self._trigger = KeyTrigger(self.settings.trigger, lambda: self.call_soon(self.on_trigger),
-                                       on_escape=lambda: self.call_soon(self.dismiss))
+            voice = self.settings.voice
+            self._trigger = KeyTrigger(
+                self.settings.trigger, lambda: self.call_soon(self.on_trigger),
+                on_escape=lambda: self.call_soon(self.dismiss),
+                on_hold_start=(lambda: self.call_soon(self.listen_start)) if voice else None,
+                on_hold_end=(lambda: self.call_soon(self.listen_stop)) if voice else None,
+                on_hold_cancel=(lambda: self.call_soon(self.listen_cancel)) if voice else None)
             self._trigger.start()
         except Exception:  # no keyboard hook available
             log.exception("double-tap trigger disabled")
@@ -524,6 +639,7 @@ def main() -> None:
     if not has_key(settings):
         root.after(500, app.open_settings)
     app.start_update_checks()
+    root.after(15_000, app.preload_voice)
     log.info("%s %s running. %s = ask, %s = show/hide, %s = notetaker.", APP_NAME, __version__,
              settings.hotkey_ask, settings.hotkey_toggle, settings.hotkey_notes)
     root.mainloop()

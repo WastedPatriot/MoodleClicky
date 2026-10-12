@@ -2,6 +2,11 @@
 
 All notable changes. Versions match the GitHub Releases that the installer downloads.
 
+## [0.6.0] - 2026-10-12
+### Added
+- **Talk to it:** hold Right Ctrl, ask out loud, let go. Speech is transcribed on your PC (Whisper `base.en`, preloaded in the background) and sent with a screenshot, and the answer appears in the speech bubble. You can turn it off in Settings.
+- **Ctrl + Alt + Space** now opens a small one-line box next to the buddy instead of the big card.
+
 ## [0.5.0] - 2026-10-12
 ### Added
 - **Auto-update.** The app checks GitHub once a day. When there's a new version, the buddy tells you, and tray → **Update now** installs it in place (settings, keys and notes are kept). You can turn this off in Settings.
@@ -54,6 +59,7 @@ All notable changes. Versions match the GitHub Releases that the installer downl
 ### Added
 - First version: the cursor buddy and pop-up with Breakdown / Hint / Check modes, follow-up questions, tray icon, settings, and daily revision notes.
 
+[0.6.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.6.0
 [0.5.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.5.0
 [0.4.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.4.0
 [0.3.2]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.3.2

@@ -39,6 +39,7 @@ def main(out=None):
     root = tk.Tk()
     root.withdraw()
     s = Settings()
+    s.compact = False  # first: the full card (Ctrl+Alt+Space prompt, pages, follow-ups)
     app = App(root, s, tutor=Tutor(s, client=FakeClient()), enable_hotkeys=False, enable_tray=False)
     pump(root, 0.3)
 
@@ -189,6 +190,73 @@ def main(out=None):
     pump(root, 0.2)
     assert b.state == "showing" and b.title.cget("text") == SAMPLE["title"]
     b.close()
+
+    # --- talk to it: hold Right Ctrl, speak, let go -------------------------------------------
+    import numpy as np
+
+    from moodleclicky.lecture.transcribe import Segment
+
+    class FakeRec:
+        error = ""
+
+        def start(self):
+            self.started = True
+
+        def stop(self):
+            return (0.3 * np.sin(np.linspace(0, 900, 24000))).astype(np.float32)
+
+    class FakeTx:
+        _model = object()
+
+        def transcribe_audio(self, audio, offset=0.0, prompt=""):
+            return [Segment(0, 1.5, "Why is this quadratic?")]
+
+    app._voice_rec, app._voice_tx = FakeRec(), FakeTx()
+    said.clear()
+    thought = []
+    orig_thinking = app.speech.thinking
+    app.speech.thinking = lambda text="Having a look": (thought.append(text), orig_thinking(text))
+    app.listen_start()
+    assert app._listening and app.speech.visible and "LISTENING" in said[-1][0]
+    app.listen_stop()
+    for _ in range(300):
+        pump(root, 0.02)
+        if not app.busy and app.player.playing:
+            break
+    asked = fake.calls[-1]["messages"][0]["content"][1]["text"]
+    assert "Student: Why is this quadratic?" in asked, asked  # the spoken question went to the AI
+    assert any("Why is this quadratic?" in text for text in thought), thought  # and was shown back to you
+    app.player.stop()
+
+    # nothing said -> friendly nudge, no AI call
+    class SilentTx(FakeTx):
+        def transcribe_audio(self, audio, offset=0.0, prompt=""):
+            return []
+
+    app._voice_tx = SilentTx()
+    n_calls = len(fake.calls)
+    app.listen_start()
+    app.listen_stop()
+    for _ in range(100):
+        pump(root, 0.02)
+        if said and "Didn't catch that" in said[-1][1]:
+            break
+    assert "Didn't catch that" in said[-1][1] and len(fake.calls) == n_calls
+    app.player.stop()
+
+    # --- type a question: small box by the buddy, answer in the speech bubble -------------------
+    app.start_prompt()
+    pump(root, 0.2)
+    assert app.quick.visible and b.state == "hidden"
+    app.quick.entry.insert(0, "what does the inner loop do")
+    app.quick._submit()
+    for _ in range(300):
+        pump(root, 0.02)
+        if not app.busy and app.player.playing:
+            break
+    assert not app.quick.visible and app.player.playing
+    assert "Student: what does the inner loop do" in fake.calls[-1]["messages"][0]["content"][1]["text"]
+    app.player.stop()
 
     # update available -> the buddy says so once; tray item becomes "Update now (vX)"
     app._update_result("v99.0.0", False)

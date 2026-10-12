@@ -12,7 +12,7 @@
 
 Stuck on a Moodle quiz question, a coursework task or an error in your code? **Double-tap Right Ctrl.** MoodleClicky screenshots what's under your mouse, flies its little cursor buddy over to the part that matters, and talks you through it in a speech bubble, one step at a time. There's no chat window to open and nothing to type.
 
-If you're writing in a text box, it also suggests what goes there. Double-tap again and it types it in for you.
+If you're writing in a text box, it also suggests what goes there. Double-tap again and it types it in for you. You can also just ask it something: **hold Right Ctrl and talk.**
 
 <p align="center"><img src="docs/demo.gif" alt="Demo: the cursor buddy explaining a Big-O question step by step" width="88%"></p>
 
@@ -49,12 +49,18 @@ You'll need an API key from [console.anthropic.com](https://console.anthropic.co
 2. **Double-tap Right Ctrl.** The buddy grows, takes a look, and starts talking.
 3. Read along. It points at each part as it explains, then fades away. Clicks go straight through it.
 
+### Talking to it
+
+- **Say it:** hold **Right Ctrl**, ask your question out loud ("why is this one quadratic?"), and let go. Your voice is turned into text on your PC and never uploaded. The buddy looks at your screen and answers in the bubble.
+- **Type it:** press **Ctrl + Alt + Space**. A one-line box opens next to the buddy. Type, then press Enter.
+
 | Keys | |
 |---|---|
 | **Right Ctrl ×2** | Look at what's under the mouse and explain it |
+| **Hold Right Ctrl** and talk | Ask a question out loud; let go when you're done |
 | **Right Ctrl ×2** again (while it's talking) | Type the suggestion into the box you were in. Ctrl+Z undoes it |
 | **Esc** | Hide the speech bubble |
-| **Ctrl + Alt + Space** | Type a question first ("why is this O(n²)?") |
+| **Ctrl + Alt + Space** | Type a question in a small box by the buddy |
 | **Ctrl + Alt + N** | Lecture / meeting notetaker |
 | **Ctrl + Alt + M** | Mark "this bit matters" while recording |
 | **Ctrl + Alt + H** | Show / hide the buddy |

@@ -435,3 +435,62 @@ def test_update_check():
 
     assert updater.check(offline) is None  # never bothers you when offline
     assert not updater.can_self_update()  # tests aren't the installed Windows app
+
+
+def test_hold_to_talk_vs_taps():
+    from moodleclicky.triggers import DoubleTap
+
+    events = []
+    clock = Clock()
+    d = DoubleTap(lambda: events.append("tap2"), clock=clock, on_hold_start=lambda: events.append("start"),
+                  on_hold_end=lambda: events.append("end"), on_hold_cancel=lambda: events.append("cancel"))
+    d.watched_down()
+    clock.t += 0.2
+    d.check_hold()  # timer fired early: not a hold yet
+    clock.t += 0.4
+    d.check_hold()
+    assert events == ["start"] and d.holding
+    clock.t += 2.0  # talking...
+    d.watched_up()
+    assert events == ["start", "end"] and not d.holding
+    tap(d, clock)  # a hold never counts as one of the double-tap taps
+    assert events == ["start", "end"]
+    tap(d, clock)
+    assert events[-1] == "tap2"
+
+    clock.t += 5
+    d.watched_down()  # holding, then Ctrl+C: not push-to-talk after all
+    clock.t += 0.6
+    d.check_hold()
+    d.other_key()
+    d.watched_up()
+    assert events[-2:] == ["start", "cancel"]
+
+    clock.t += 5
+    d.watched_down()  # Ctrl+V before the hold delay: never starts listening
+    d.other_key()
+    clock.t += 0.6
+    d.check_hold()
+    d.watched_up()
+    assert events[-1] == "cancel"
+
+
+def test_transcribe_question():
+    import numpy as np
+
+    from moodleclicky.lecture.transcribe import Segment
+    from moodleclicky.voice import transcribe_question
+
+    class Tx:
+        def __init__(self):
+            self.peak = None
+
+        def transcribe_audio(self, audio, offset=0.0, prompt=""):
+            self.peak = float(np.max(np.abs(audio)))
+            return [Segment(0, 1, " why is this "), Segment(1, 2, "quadratic? ")]
+
+    tx = Tx()
+    quiet = (0.02 * np.sin(np.linspace(0, 300, 16000))).astype(np.float32)
+    assert transcribe_question(tx, quiet) == "why is this quadratic?"
+    assert tx.peak > 0.3  # quiet mic boosted before Whisper
+    assert transcribe_question(tx, np.zeros(1000, dtype=np.float32)) == ""  # a stray short press

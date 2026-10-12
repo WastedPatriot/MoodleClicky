@@ -221,3 +221,58 @@ class SpeechPlayer:
             self._job = self.root.after(int((ln.secs + type_secs) * 1000), self.stop)
         else:
             self._job = self.root.after(int((ln.secs + type_secs) * 1000), self._next)
+
+
+class QuickAsk:
+    """A one-line 'ask anything' box beside the buddy (Ctrl+Alt+Space). Enter asks, Esc cancels."""
+
+    def __init__(self, root: tk.Misc, on_submit: Callable[[str], None], on_cancel: Callable[[], None]):
+        self.root, self.on_submit, self.on_cancel = root, on_submit, on_cancel
+        self.visible = False
+        w = self.win = tk.Toplevel(root)
+        w.overrideredirect(True)
+        w.attributes("-topmost", True)
+        w.config(bg=t.BORDER_HI)
+        inner = tk.Frame(w, bg=t.CARD, padx=12, pady=10)
+        inner.pack(padx=1, pady=1)
+        f = t.fonts(w)
+        tk.Label(inner, text="ASK ABOUT YOUR SCREEN", bg=t.CARD, fg=t.ACCENT_HI, font=f.tiny_bold,
+                 anchor="w").pack(fill="x")
+        self.field = t.Field(inner, placeholder="e.g. why is this O(n²)?", width=34, bg=t.CARD)
+        self.field.pack(fill="x", pady=(6, 4))
+        self.entry = self.field.entry
+        tk.Label(inner, text="Enter to ask  ·  Esc to cancel  ·  or hold Right Ctrl and just say it", bg=t.CARD,
+                 fg=t.SUBTLE, font=f.tiny, anchor="w").pack(fill="x")
+        self.entry.bind("<Return>", lambda _e: self._submit())
+        self.entry.bind("<Escape>", lambda _e: self.close(cancelled=True))
+        w.withdraw()
+
+    def open(self, near: tuple[int, int]) -> None:
+        self.entry.delete(0, "end")
+        self.win.update_idletasks()
+        w, h = self.win.winfo_reqwidth(), self.win.winfo_reqheight()
+        left, top, right, bottom = monitor_bounds(*near)
+        x, y = near[0] + 40, near[1] + 14
+        if x + w > right - 6:
+            x = near[0] - w - 20
+        y = max(top + 6, min(y, bottom - h - 6))
+        self.win.geometry(f"+{int(x)}+{int(y)}")
+        self.win.deiconify()
+        self.win.lift()
+        self.win.focus_force()
+        self.entry.focus_set()
+        self.visible = True
+
+    def close(self, cancelled: bool = False) -> None:
+        self.visible = False
+        self.win.withdraw()
+        if cancelled:
+            self.on_cancel()
+
+    def _submit(self) -> None:
+        text = self.entry.get().strip()
+        self.close()
+        if text:
+            self.on_submit(text)
+        else:
+            self.on_cancel()

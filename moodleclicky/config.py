@@ -54,6 +54,8 @@ class Settings:
     open_on_answer: bool = False  # False = walk through the steps first
     save_notes: bool = True
     check_updates: bool = True  # look for a newer release on GitHub once a day
+    voice: bool = True  # hold the wake-up key (Right Ctrl) and speak your question
+    voice_model: str = "base.en"  # speech-to-text for push-to-talk (small + fast; runs on this PC)
     course_context: str = ""  # e.g. "Birkbeck BSc Computer Science, Year 2"
     max_image_edge: int = 1568
     # Lecture / meeting notetaker (see moodleclicky/lecture)

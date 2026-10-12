@@ -96,6 +96,7 @@ def check_ui(report: list[str]) -> None:
     root = tk.Tk()
     root.withdraw()
     s = Settings()
+    s.compact = False  # check the full card first; the speech bubble is checked below
     app = App(root, s, tutor=Tutor(s, client=FakeClaude()), enable_hotkeys=False, enable_tray=False)
     pump(root, 0.2)
     app.start_prompt()
@@ -116,6 +117,7 @@ def check_ui(report: list[str]) -> None:
     app.bubble.close()
     report.append("ok    hotkey -> screenshot -> breakdown -> buddy points -> answer")
 
+    app.settings.compact = True
     app.look_now()  # what a double-tap of Right Ctrl does: speech bubble, no card
     for _ in range(500):
         pump(root, 0.02)
@@ -242,7 +244,20 @@ def check_keyboard(root, report: list[str]) -> None:
     double_tap(Key.ctrl_r)  # Right Ctrl x2 = wake up
     trig.stop()
     check(fired == [1], f"double-tap Right Ctrl fired {len(fired)} times (want 1)")
+
+    holds = []
+    trig = KeyTrigger("double_rctrl", lambda: holds.append("tap"),
+                      on_hold_start=lambda: holds.append("start"), on_hold_end=lambda: holds.append("end"))
+    trig.start()
+    time.sleep(0.4)
+    kb.press(Key.ctrl_r)  # hold Right Ctrl ~1 s = push-to-talk
+    time.sleep(1.0)
+    kb.release(Key.ctrl_r)
+    time.sleep(0.4)
+    trig.stop()
+    check(holds == ["start", "end"], f"holding Right Ctrl gave {holds} (want start, end)")
     report.append("ok    double-tap Right Ctrl wakes the buddy (Left Ctrl x2 and Ctrl+other key don't)")
+    report.append("ok    holding Right Ctrl = push-to-talk (start on hold, stop on release, not a tap)")
 
     win = tk.Toplevel(root)
     win.title("MoodleClicky self-test box")

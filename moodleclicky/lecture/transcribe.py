@@ -58,8 +58,11 @@ class WhisperTranscriber:
     def transcribe(self, wav: Path, offset: float = 0.0, prompt: str = "") -> list[Segment]:
         from moodleclicky.lecture.audio import read_wav
 
+        return self.transcribe_audio(read_wav(wav), offset, prompt)  # decode ourselves: no ffmpeg/PyAV needed
+
+    def transcribe_audio(self, audio, offset: float = 0.0, prompt: str = "") -> list[Segment]:
+        """16 kHz mono float32 samples -> segments (used directly by push-to-talk)."""
         self.load()
-        audio = read_wav(wav)  # decode ourselves: no ffmpeg/PyAV needed
         if len(audio) < 1600:
             return []
         segments, _info = self._model.transcribe(

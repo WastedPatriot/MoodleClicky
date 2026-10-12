@@ -166,7 +166,7 @@ class SettingsWindow:
                    hint="So group-meeting notes can pull out your tasks.", pady=(0, 0))
 
         # -- Hotkeys
-        h = t.Card(body, "Hotkeys", "pynput format, e.g. <ctrl>+<alt>+<space>")
+        h = t.Card(body, "Hotkeys", "pynput format, e.g. <ctrl>+<alt>+q")
         h.pack(fill="x", pady=(0, 10))
         self.hk = {}
         for key, label in (("hotkey_ask", "Ask about my screen"), ("hotkey_toggle", "Show / hide buddy"),

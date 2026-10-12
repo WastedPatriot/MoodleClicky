@@ -225,7 +225,7 @@ setup_menu() {
   for t in "${triggers[@]}"; do [ "$(current trigger)" = "$t" ] && t_idx=$i; i=$((i + 1)); done
   choose "How do you want to call the buddy? (press it again to type a suggestion)" "$t_idx" \
     "Double-tap Ctrl (either one) - recommended" "Double-tap RIGHT Ctrl only" "Triple-tap Ctrl" \
-    "Tap Right Ctrl once" "Ctrl + Alt + Space"
+    "Tap Right Ctrl once" "Ctrl + Alt + Q"
   local trigger="${triggers[$((REPLY - 1))]}"
   local efforts=(low medium high) e_idx=1
   case "$(current effort)" in medium) e_idx=2 ;; high) e_idx=3 ;; esac
@@ -281,7 +281,7 @@ start_app() {
   say "  $(c 1 'Ctrl, Ctrl')          look at what's under your mouse (again = type the suggestion)"
   say "  $(c 1 'Hold Ctrl + talk')    ask a question out loud"
   say "  $(c 1 'Ctrl + Alt + A')      move your mouse onto the answer"
-  say "  $(c 1 'Ctrl + Alt + Space')  type a question"
+  say "  $(c 1 'Ctrl + Alt + Q')      type a question"
   say "  $(c 1 'Ctrl + Alt + N')      lecture / meeting notetaker"
   say ""
   say "Settings later: tray icon → Settings, or run: moodleclicky --setup"

@@ -58,7 +58,7 @@ class Settings:
     trigger: str = "double_ctrl"  # double_ctrl | double_rctrl | triple_ctrl | right_ctrl | hotkey (triggers.py)
     instant: bool = True  # look straight away; False = ask "what are you stuck on?" first
     compact: bool = True  # Clicky-style speech bubble by the buddy; False = the full card
-    hotkey_ask: str = "<ctrl>+<alt>+<space>"  # always opens the type-a-question prompt
+    hotkey_ask: str = "<ctrl>+<alt>+q"  # always opens the type-a-question prompt (Ctrl+Alt+Space is Claude's)
     hotkey_toggle: str = "<ctrl>+<alt>+h"
     hotkey_show: str = "<ctrl>+<alt>+a"  # move your mouse onto the answer
     move_mouse_to_answer: bool = False  # do that automatically once it has explained
@@ -79,7 +79,7 @@ class Settings:
     whisper_model: str = "small.en"  # local speech-to-text: tiny.en | base.en | small.en | medium.en
     your_name: str = ""  # so group-meeting notes can pull out YOUR tasks
     start_with_windows: bool = False
-    config_version: int = 3
+    config_version: int = 4
     extra: dict = field(default_factory=dict)
 
     @classmethod
@@ -97,7 +97,9 @@ class Settings:
             s.config_version = 2
         if raw.get("config_version", 1) < 3 and raw.get("trigger") == "double_rctrl":
             s.trigger = "double_ctrl"  # v0.6: Right-Ctrl-only confused people (many laptops have none)
-        s.config_version = 3
+        if raw.get("config_version", 1) < 4 and s.hotkey_ask == "<ctrl>+<alt>+<space>":
+            s.hotkey_ask = "<ctrl>+<alt>+q"  # v0.8: Ctrl+Alt+Space opens the Claude desktop app's quick entry
+        s.config_version = 4
         if s.mode not in MODES:
             s.mode = "breakdown"
         if s.effort not in EFFORTS:

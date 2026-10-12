@@ -617,7 +617,7 @@ class App:
 def trigger_hint(s: Settings) -> str:
     return {"double_rctrl": "Right Ctrl ×2", "double_ctrl": "Ctrl ×2", "triple_ctrl": "Ctrl ×3",
             "right_ctrl": "Right Ctrl"}.get(
-        s.trigger, "Ctrl+Alt+Space")
+        s.trigger, show_hint(Settings(hotkey_show=s.hotkey_ask)))
 
 
 def show_hint(s: Settings) -> str:

@@ -343,7 +343,7 @@ def test_old_right_ctrl_default_is_migrated(tmp_path):
     p = tmp_path / "config.json"
     p.write_text(json.dumps({"trigger": "double_rctrl", "config_version": 2, "effort": "high"}))
     s = Settings.load(p)
-    assert s.trigger == "double_ctrl" and s.config_version == 3 and s.effort == "high"
+    assert s.trigger == "double_ctrl" and s.config_version == 4 and s.effort == "high"
     p.write_text(json.dumps({"trigger": "double_rctrl", "config_version": 3}))  # chosen on purpose: kept
     assert Settings.load(p).trigger == "double_rctrl"
 
@@ -672,3 +672,14 @@ def test_setup_saves_custom_server():
     apply_setup({"provider": "custom", "custom_url": " http://localhost:1234/v1 ", "custom_model": "gemma3"},
                 s, store_key=lambda k, p: True, autostart=lambda on: True)
     assert (s.provider, s.custom_url, s.custom_model) == ("custom", "http://localhost:1234/v1", "gemma3")
+
+
+def test_ask_hotkey_moves_off_claudes_ctrl_alt_space(tmp_path):
+    p = tmp_path / "config.json"
+    p.write_text(json.dumps({"hotkey_ask": "<ctrl>+<alt>+<space>", "config_version": 3}))
+    assert Settings.load(p).hotkey_ask == "<ctrl>+<alt>+q"
+    p.write_text(json.dumps({"hotkey_ask": "<ctrl>+<alt>+<space>", "config_version": 4}))  # chosen on purpose
+    assert Settings.load(p).hotkey_ask == "<ctrl>+<alt>+<space>"
+    from moodleclicky.app import trigger_hint
+
+    assert trigger_hint(Settings(trigger="hotkey")) == "Ctrl+Alt+Q"

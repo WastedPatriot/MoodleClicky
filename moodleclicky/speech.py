@@ -230,7 +230,7 @@ class SpeechPlayer:
 
 
 class QuickAsk:
-    """A one-line 'ask anything' box beside the buddy (Ctrl+Alt+Space). Enter asks, Esc cancels."""
+    """A one-line 'ask anything' box beside the buddy (Ctrl+Alt+Q). Enter asks, Esc cancels."""
 
     def __init__(self, root: tk.Misc, on_submit: Callable[[str], None], on_cancel: Callable[[], None]):
         self.root, self.on_submit, self.on_cancel = root, on_submit, on_cancel

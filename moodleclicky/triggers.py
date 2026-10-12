@@ -19,7 +19,7 @@ TRIGGER_LABELS = {
     "double_ctrl": "Double-tap either Ctrl",
     "triple_ctrl": "Triple-tap either Ctrl",
     "right_ctrl": "Tap Right Ctrl on its own",
-    "hotkey": "Ctrl + Alt + Space (classic hotkey)",
+    "hotkey": "Ctrl + Alt + Q (classic hotkey)",
 }
 
 

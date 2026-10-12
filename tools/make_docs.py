@@ -222,7 +222,7 @@ def main() -> None:
     frames[0].save(DOCS / "demo.gif", save_all=True, append_images=frames[1:], duration=90, loop=0, optimize=True)
     print("wrote demo.gif", len(frames), "frames")
 
-    # --- the full card (tray -> Show full answer, or Ctrl+Alt+Space) ------------------
+    # --- the full card (tray -> Show full answer, or Ctrl+Alt+Q) ------------------
     app.show_full_answer()
     app.bubble.jump_answer()
     d.snap("answer.png")

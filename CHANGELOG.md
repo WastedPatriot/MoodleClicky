@@ -2,6 +2,10 @@
 
 All notable changes. Versions match the GitHub Releases that the installer downloads.
 
+## [0.8.1] - 2026-10-12
+### Changed
+- **Type a question** is now **Ctrl + Alt + Q**. Ctrl + Alt + Space also opens the Claude desktop app's quick entry, so both popped up. Existing settings are moved over automatically; you can pick any key in Settings → Hotkeys.
+
 ## [0.8.0] - 2026-10-12
 ### Added
 - **Linux** (Parrot OS, Kali, Debian, Ubuntu, Mint… on X11): one-line installer `install.sh` with the same setup menu, menu entry, start-at-login, self-update and uninstall.
@@ -79,6 +83,7 @@ All notable changes. Versions match the GitHub Releases that the installer downl
 ### Added
 - First version: the cursor buddy and pop-up with Breakdown / Hint / Check modes, follow-up questions, tray icon, settings, and daily revision notes.
 
+[0.8.1]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.8.1
 [0.8.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.8.0
 [0.7.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.7.0
 [0.6.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.6.0

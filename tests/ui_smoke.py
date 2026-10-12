@@ -39,7 +39,7 @@ def main(out=None):
     root = tk.Tk()
     root.withdraw()
     s = Settings()
-    s.compact = False  # first: the full card (Ctrl+Alt+Space prompt, pages, follow-ups)
+    s.compact = False  # first: the full card (Ctrl+Alt+Q prompt, pages, follow-ups)
     app = App(root, s, tutor=Tutor(s, client=FakeClient()), enable_hotkeys=False, enable_tray=False)
     pump(root, 0.3)
 

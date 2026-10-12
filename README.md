@@ -1,15 +1,26 @@
-# MoodleClicky
+<p align="center">
+  <img src="docs/banner.png" alt="MoodleClicky: a study buddy that lives by your cursor" width="100%">
+</p>
 
-**A study buddy that lives next to your mouse cursor.** Stuck on a Moodle question, a coursework task or an error in your code? **Double-tap Right Ctrl.** MoodleClicky looks at your screen, flies over to the right spot, and talks you through it one small step at a time in a **little speech bubble** right next to it. No chatbot window, no big pop-up, no pressing Enter. If you're typing in a box, it suggests what goes there. **Double-tap Right Ctrl again** and it types it in for you.
+<p align="center">
+  <a href="https://github.com/WastedPatriot/MoodleClicky/actions/workflows/ci.yml"><img alt="Build" src="https://github.com/WastedPatriot/MoodleClicky/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/WastedPatriot/MoodleClicky/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/WastedPatriot/MoodleClicky?label=release&color=4f8cff"></a>
+  <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white">
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white">
+  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-22c55e"></a>
+</p>
 
-![MoodleClicky demo](docs/demo.gif)
+Stuck on a Moodle quiz question, a coursework task or an error in your code? **Double-tap Right Ctrl.** MoodleClicky screenshots what's under your mouse, flies its little cursor buddy over to the part that matters, and talks you through it in a speech bubble, one step at a time. There's no chat window to open and nothing to type.
 
-> Personal Windows desktop app. Works with **Claude** or **DeepSeek**. Inspired by [Clicky](https://github.com/farzaa/clicky) for Mac, built for studying.
-> Also has a **lecture and meeting notetaker** that records, transcribes on your PC, and catches you up if you zone out.
+If you're writing in a text box, it also suggests what goes there. Double-tap again and it types it in for you.
+
+<p align="center"><img src="docs/demo.gif" alt="Demo: the cursor buddy explaining a Big-O question step by step" width="88%"></p>
+
+It works with **Claude** or **DeepSeek** (your own API key). It also comes with a **lecture and meeting notetaker** that transcribes on your PC and catches you up when you zone out.
 
 ---
 
-## Install (Windows), one command
+## Install
 
 Open **PowerShell** (Start → type *PowerShell* → Enter) and paste:
 
@@ -17,169 +28,153 @@ Open **PowerShell** (Start → type *PowerShell* → Enter) and paste:
 irm https://raw.githubusercontent.com/WastedPatriot/MoodleClicky/main/install.ps1 | iex
 ```
 
-It downloads the latest version, adds **Start menu + Desktop** shortcuts, then opens a quick **setup menu right in the terminal**: pick Claude or DeepSeek, paste your API key (hidden as you type), and add your name, your course, start-with-Windows and notetaker options. Then it launches MoodleClicky into your system tray. No Python and no admin rights needed.
+That one command:
+1. Downloads the latest release (no Python or admin rights needed).
+2. Adds Start menu and Desktop shortcuts.
+3. Asks a few setup questions right in the terminal: Claude or DeepSeek, your API key (hidden as you type), your name and course, wake-up key, and speed.
+4. Starts MoodleClicky in your system tray.
 
-| I want to… | Do this |
+| | |
 |---|---|
-| **Update** to the newest version | Run the same command again. Your settings, keys and notes are kept |
-| **Change settings** later | Start menu → **MoodleClicky Setup**, or tray icon → Settings |
-| **Uninstall** | Start menu → **Uninstall MoodleClicky**. It asks whether to keep your notes |
-| Install from a zip you already downloaded | `.\install.ps1 -Zip C:\path\to\MoodleClicky-windows.zip` |
+| **Update** | It checks for new versions by itself. When one is out, the buddy tells you. Tray icon → **Update now** (your settings, keys and notes are kept). |
+| **Change settings** | Tray icon → **Settings**, or Start menu → **MoodleClicky Setup** |
+| **Uninstall** | Start menu → **Uninstall MoodleClicky** (it asks whether to keep your notes) |
+| **Offline install** | `.\install.ps1 -Zip path\to\MoodleClicky-windows.zip` |
 
-**Got an older copy you downloaded by hand?**
-1. Right-click the tray icon (bottom-right, by the clock) and choose **Quit**.
-2. Delete the folder you unzipped it into.
-3. Run the install command above.
+You'll need an API key from [console.anthropic.com](https://console.anthropic.com) (Claude) or [platform.deepseek.com](https://platform.deepseek.com) (DeepSeek, cheaper).
 
-If you'd turned on *Start with Windows*, the new install takes that over automatically.
+## Using it
 
-<details><summary>Run from source instead (for tinkering)</summary>
+1. Hover over the thing you're stuck on.
+2. **Double-tap Right Ctrl.** The buddy grows, takes a look, and starts talking.
+3. Read along. It points at each part as it explains, then fades away. Clicks go straight through it.
 
-Install **Python 3.11+** from [python.org](https://www.python.org/downloads/) (tick *"Add python.exe to PATH"*). Download this repo, then double-click **`run.bat`**. The first run sets everything up.
-</details>
-
-## Keys
-
-| Keys | What it does |
+| Keys | |
 |---|---|
-| **Right Ctrl, Right Ctrl** (double-tap) | Look at what's under your mouse **right now** and explain it |
-| **Right Ctrl ×2** again | Type the ✍ suggestion into the box you were typing in (Ctrl+Z undoes it) |
+| **Right Ctrl ×2** | Look at what's under the mouse and explain it |
+| **Right Ctrl ×2** again (while it's talking) | Type the suggestion into the box you were in. Ctrl+Z undoes it |
+| **Esc** | Hide the speech bubble |
 | **Ctrl + Alt + Space** | Type a question first ("why is this O(n²)?") |
-| **Ctrl + Alt + H** | Show or hide the cursor buddy |
-| **Ctrl + Alt + N** | Open the lecture / meeting notetaker |
-| **Ctrl + Alt + M** | ⭐ Mark "this bit matters" while recording (highlighted in your notes) |
-| **← / →** | Previous / next step in the pop-up |
-| **Esc** | Close the pop-up |
+| **Ctrl + Alt + N** | Lecture / meeting notetaker |
+| **Ctrl + Alt + M** | Mark "this bit matters" while recording |
+| **Ctrl + Alt + H** | Show / hide the buddy |
 
-**Why Right Ctrl?** Tapping Ctrl on its own does nothing in browsers, Word or code editors, so it never gets in the way. Ctrl+C, Ctrl+V, Ctrl+click and holding Ctrl don't count. It's the **Right** Ctrl because double-tapping *Left* Ctrl is PowerToys' **Find My Mouse** spotlight. Prefer something else? Settings → **Wake-up key**: either Ctrl ×2, Right Ctrl ×1, or the classic Ctrl+Alt+Space.
+Tapping Ctrl on its own does nothing in browsers, Word or IDEs, so it never gets in your way. Ctrl+C, Ctrl+V and Ctrl+click don't count as taps. It uses the **right** Ctrl because double-tapping the left one is PowerToys' *Find My Mouse*. You can change the key in Settings.
 
-### 💬 Speech bubble
+### Modes
 
-The answer arrives Clicky-style:
-- **A small speech bubble** sits right beside the cursor buddy and types itself out.
-- **The buddy grows** while it's thinking and talking, so you can see it, then shrinks back.
-- **It walks you through it:** what the question is asking, then each step (the buddy flies to the bit of the screen it's talking about), then the answer and why.
-- **Then it fades away** on its own.
-
-It never gets in the way:
-- **Clicks go straight through** the bubble and the buddy.
-- **Your cursor stays in the box you were typing in.**
-- **Esc** hides it.
-
-Want the whole thing at once, with Back/Next and follow-up questions? Tray icon → **Show full answer**, or turn off *Speech bubble* in Settings for the big card.
-
-### ✍ Typing help
-
-When you call the buddy while you're writing in a box (a Moodle answer, a forum post, an essay, a line of code), the pop-up shows a **Type this** card. Depending on what you're doing, that's:
-- the answer for the box
-- the rest of your sentence
-- the next line(s) of code
-
-Double-tap Right Ctrl again, or click **Type it**, and it's pasted at your cursor. Your clipboard is put back afterwards. In **Hint** mode it only gives you a starter, never the full answer.
-
-### ⚡ Speed
-
-Replies stream in: the title and summary appear as soon as they're written, and the rest follows. Settings → **Speed vs depth** picks **Fast** (the default, a few seconds), Balanced or Thorough.
-
-You can change all of these in Settings (⚙ in the pop-up, or right-click the tray icon).
-
-## Three modes
-
-| Mode | What you get |
+| | |
 |---|---|
-| **Breakdown** (default) | What the question is really asking, then the steps one at a time, with the buddy pointing at each part, then the answer, why it works, and a quick "check yourself" question |
-| **Hint** | Nudges only, no answer. For when you want to get there yourself |
-| **Check** | Write your answer first, then it marks your working and points at what's off |
+| **Breakdown** *(default)* | What the question is really asking → the steps → the answer → why it works |
+| **Hint** | Nudges only, never the answer. Typing help just gives you a sentence starter |
+| **Check** | Write your answer first; it marks your working and points at what's wrong |
 
-Switch modes in the pop-up at any time. You can also type follow-up questions ("why n squared?") in the box at the bottom.
+Want everything at once, with Back/Next and follow-up questions? Tray → **Show full answer**. If you prefer that card to the speech bubble every time, switch the bubble off in Settings.
 
-## Screenshots
-
-| Speech bubble: talking you through it | Full answer (tray → Show full answer) |
+| Speech bubble | Full answer |
 |---|---|
-| ![Pointing](docs/pointing.png) | ![Answer](docs/answer.png) |
-| **Hint mode: no spoilers** | **Ask anything** |
-| ![Hint](docs/hint.png) | ![Prompt](docs/prompt.png) |
+| ![The buddy pointing at the inner loop](docs/pointing.png) | ![The full answer card](docs/answer.png) |
+| **Hint mode** | **Typing a question** |
+| ![Hint mode](docs/hint.png) | ![Ask a question](docs/prompt.png) |
 
-<img src="docs/settings.png" alt="Settings" width="480">
+## Lecture and meeting notetaker
 
-## 🎙️ Lecture and meeting notetaker
+For lectures (in the room, Teams, Zoom or Panopto) and group-project meetings.
 
-For lectures (in person, Teams, Zoom or Panopto) and group-project meetings, especially when you can't give it 100% attention.
+- **Records** your microphone and/or the computer's own audio, and **transcribes it on your PC** with Whisper. Free, and the audio never leaves your machine.
+- **Catch me up** (2, 5 or 10 min): what's being discussed now, what you missed, anything aimed at *you*, and something sensible to say if you're put on the spot.
+- **Make notes**:
+  - *Lectures*: key points, concepts explained, examples, deadlines, and test-yourself questions.
+  - *Meetings*: decisions, who's doing what, **your** tasks, and a step-by-step plan.
+- **Crash-safe:** the transcript is saved as it goes, so if the laptop dies you can make notes from the saved session later.
 
-1. **Ctrl + Alt + N** (or tray → *Lecture / meeting notetaker*), pick **Lecture** or **Group meeting**, then press **Start**.
-2. It records your **microphone and/or computer audio** and transcribes it **on your PC** (free, offline speech-to-text with Whisper). The live transcript scrolls as it goes.
-3. Zoned out? Press **Catch me up** (2, 5 or 10 minutes). You get what's being discussed right now, what you missed, anything aimed at **you**, and something sensible to say if you're put on the spot.
-4. Press **Make notes** at the end:
-   - **Lecture**: summary, key points, concepts explained, examples, your ⭐ moments, to-dos and deadlines, "test yourself" questions.
-   - **Group meeting**: decisions, who's doing what, **your tasks** (set your name in Settings), and a step-by-step plan.
-
-| Live notetaker | Meeting notes it writes |
+| Live transcript | Meeting notes it writes |
 |---|---|
 | ![Notetaker](docs/notetaker.png) | ![Meeting notes](docs/meeting_notes.png) |
 
-**Built not to lose your notes:**
-- The transcript is saved as it happens. If the laptop dies mid-lecture, reopen the session under **Past** and make notes from what was saved.
-- If your mic gets unplugged, it keeps retrying.
-- If no sound is playing, recording carries on regardless.
-- Audio is deleted once it's transcribed.
-
 Only record where you're allowed to, and tell your group first.
 
-## Revision notes, for free
+## Privacy and cost
 
-Every explanation is saved as Markdown, one file per day, in
-`%APPDATA%\MoodleClicky\notes\`. Open the folder from the tray menu, then revise from it or paste it into OneNote or Obsidian.
-
-## Cost and privacy
-
-- You use **your own API key**. Each pop-up shows roughly what that answer cost and the running total for the session.
-  - Claude Opus 5.5: about $0.01–0.03 per question.
-  - DeepSeek Flash: a fraction of a cent.
-- A screenshot is taken **only when you press the hotkey**. It's sent to the AI provider you picked and isn't stored anywhere else.
-- Lecture audio never leaves your PC. Only the text transcript goes to the AI, and only when you press *Catch me up* or *Make notes*.
-- Your API keys are stored in **Windows Credential Manager**, not in a text file.
+- A screenshot is only taken when **you** trigger it. It goes to the AI provider you chose and nowhere else.
+- Lecture audio stays on your PC. Only the text transcript is sent, and only when you ask for notes.
+- API keys live in **Windows Credential Manager**, not in a text file.
+- You pay your provider directly. Each answer shows roughly what it cost.
+  - With Claude on *Fast* that's usually around a cent.
+  - DeepSeek is a fraction of that.
+- Every explanation is also saved to `%APPDATA%\MoodleClicky\notes\` as Markdown, one file per day, so you can revise from it later.
 
 ## How it works
 
 ```
-hotkey ─► hide own windows ─► screenshot the monitor under the cursor (cursor ringed)
-       ─► Claude / DeepSeek returns JSON: title, summary, steps[{text, x, y}], answer, why, check_yourself
-       ─► buddy flies to each step's (x, y) ─► pop-up pages through the steps
+Right Ctrl ×2
+  → hide our own windows, screenshot the monitor under the cursor (cursor ringed), JPEG
+  → Claude / DeepSeek returns structured JSON:
+      { title, summary, type_text, steps: [{ text, label, x, y }], answer, why, check_yourself }
+  → title + summary stream into the speech bubble while the rest arrives
+  → the buddy flies to each step's (x, y), mapped back from image to screen coordinates
+  → Right Ctrl ×2 again: refocus your window, paste type_text, restore your clipboard
 ```
 
-| File | Job |
+<details>
+<summary>Code map</summary>
+
+| | |
 |---|---|
-| `moodleclicky/app.py` | Wiring: hotkeys (pynput), tray icon (pystray), worker threads |
-| `moodleclicky/triggers.py` | Double-tap Right Ctrl (or either Ctrl) wake-up key (ignores Ctrl+C etc.) |
-| `moodleclicky/typer.py` | Types a suggestion into the box you were in (refocus, paste, restore clipboard) |
-| `moodleclicky/brain.py` | Prompt, JSON schema, Claude and DeepSeek backends, cost estimate |
-| `moodleclicky/capture.py` | Screenshot of the right monitor; maps the AI's coordinates back to the screen |
-| `moodleclicky/buddy.py` | The cursor buddy (follows you, flies to targets, thinking dots) |
-| `moodleclicky/bubble.py` | The pop-up (pages, back/next, show answer, follow-ups) |
-| `moodleclicky/settings_ui.py` / `config.py` | Settings window, and settings stored in `%APPDATA%\MoodleClicky` |
-| `moodleclicky/notes.py` | Daily revision notes |
-| `moodleclicky/lecture/` | Notetaker: `audio.py` (mic + loopback recorder), `transcribe.py` (Whisper), `session.py` (crash-safe sessions), `summarise.py` (notes, meeting plan, catch-up) |
-| `moodleclicky/lecture_ui.py` | Notetaker window + notes viewer |
-| `moodleclicky/theme.py` | Shared dark theme: pill buttons, segmented controls, toggles, cards |
-| `moodleclicky/selftest.py` | `MoodleClicky.exe --selftest`: checks the build end to end, offline |
+| `moodleclicky/app.py` | Wiring: tray, hotkeys, worker threads → Tk thread |
+| `moodleclicky/triggers.py` | Double-tap detector (ignores Ctrl+C, held Ctrl, typing between taps) |
+| `moodleclicky/brain.py` | Prompt + JSON schema, Claude and DeepSeek backends, streaming, cost |
+| `moodleclicky/capture.py` | Multi-monitor screenshot, DPI-aware coordinate mapping |
+| `moodleclicky/speech.py` | Speech bubble + the player that walks through the steps |
+| `moodleclicky/buddy.py` | The cursor buddy (follows, flies to targets, grows when active) |
+| `moodleclicky/typer.py` | Types a suggestion into the window you were in |
+| `moodleclicky/bubble.py` | Full answer card |
+| `moodleclicky/lecture/` | Recorder (mic + WASAPI loopback), Whisper transcription, crash-safe sessions, notes |
+| `moodleclicky/updater.py` | Checks GitHub Releases, updates in place |
+| `moodleclicky/selftest.py` | `MoodleClicky.exe --selftest`: end-to-end check of an install |
+| `install.ps1` | Installer, setup menu, updater, uninstaller |
+
+</details>
+
+## How it's tested
+
+Every push runs the same checks on Linux and on a real **Windows** machine ([CI workflow](.github/workflows/ci.yml)):
+
+- **Unit tests** (`pytest`):
+  - the double-tap rules (Ctrl+C, held keys, typing between taps)
+  - screenshot ↔ screen coordinate maths across monitors
+  - both AI backends, against fakes, including streaming, retries and error messages
+  - the notetaker's recorder, crash recovery and note formats
+  - real Whisper transcription of synthesised speech
+- **UI test:** drives the real windows on a virtual screen:
+  - double-tap → speech bubble → buddy points → typing with clipboard restore → Esc → full card
+  - settings scrolling on a laptop-sized screen
+- **The built `.exe` tests itself** (`--selftest`) on Windows:
+  - real key events: Right Ctrl ×2 wakes it, Left Ctrl ×2 doesn't
+  - a suggestion pasted into a real text box
+  - the speech bubble, the notetaker, settings, and loading the speech model
+- **Installer test:** installs the fresh build with scripted answers, checks the shortcuts and saved settings, checks the app stays running, then uninstalls.
+- **Lint and security scan:** `ruff` and `bandit`.
+
+A release is only published if all of that passes.
 
 ## Development
 
 ```bash
 pip install -r requirements.txt pytest ruff bandit
-pytest -q                                   # core tests (no API calls, fake client)
-ruff check . && bandit -q -r moodleclicky   # lint + security scan
-xvfb-run -a -s "-screen 0 1600x900x24" python tests/ui_smoke.py   # drives the real windows (Linux)
-xvfb-run -a -s "-screen 0 1600x900x24" python tools/make_docs.py  # regenerates the screenshots + GIF
+pytest -q
+ruff check . && bandit -q -r moodleclicky
+xvfb-run -a -s "-screen 0 1600x900x24" python tests/ui_smoke.py
+python -m moodleclicky --selftest            # end-to-end, offline
+xvfb-run -a -s "-screen 0 1600x900x24" python tools/make_docs.py   # regenerate screenshots + GIF
 ```
 
-Build the Windows app yourself: `tools\build_exe.bat`. It runs PyInstaller, then self-tests the built `.exe`, and writes the output to `dist\MoodleClicky-windows.zip`. CI does the same on every push, and every green build on `main` publishes the Release that the install command downloads.
-
-**Troubleshooting:** everything is logged to `%APPDATA%\MoodleClicky\moodleclicky.log`. Run `MoodleClicky.exe --selftest report.txt` to check an install.
+- **Windows build:** `tools\build_exe.bat`, which runs PyInstaller, self-tests the build and writes `dist\MoodleClicky-windows.zip`.
+- **Logs:** `%APPDATA%\MoodleClicky\moodleclicky.log`
+- **What changed between versions:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Use it fairly
 
-This tool is built for **learning**: breakdowns, hints and checking your own work. Check your university's rules before using any AI help during assessed quizzes or exams.
+It's built for learning: breakdowns, hints and checking your own work. Check your university's rules before using any AI help on assessed quizzes or exams.
 
-MIT licence.
+Inspired by [Clicky](https://github.com/farzaa/clicky) for macOS. MIT licence.

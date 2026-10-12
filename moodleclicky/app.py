@@ -50,6 +50,7 @@ class App:
         self._last_near: tuple[int, int] = (0, 0)
         self._via_card = False  # True when the request came from the full card (prompt / follow-up)
         self._said_summary = ""
+        self.update_tag: str | None = None  # newer release found on GitHub
         self.bubble = Bubble(
             root,
             on_ask=self.ask,
@@ -270,6 +271,46 @@ class App:
         else:
             subprocess.Popen(["xdg-open", path])  # nosec B603 B607
 
+    # ---- updates ----------------------------------------------------------
+    def start_update_checks(self, first_delay_ms: int = 20_000) -> None:
+        if self.settings.check_updates:
+            self.root.after(first_delay_ms, self._check_updates)
+
+    def _check_updates(self, announce_up_to_date: bool = False) -> None:
+        from moodleclicky import updater
+
+        def work():
+            tag = updater.check()
+            self.call_soon(lambda: self._update_result(tag, announce_up_to_date))
+
+        threading.Thread(target=work, name="update-check", daemon=True).start()
+        if self.settings.check_updates:
+            self.root.after(24 * 3600 * 1000, self._check_updates)  # again tomorrow if left running
+
+    def _update_result(self, tag: str | None, announce_up_to_date: bool) -> None:
+        if tag and tag != self.update_tag:
+            self.update_tag = tag
+            if self._tray:
+                self._tray.update_menu()
+            if not self.player.playing and not self.busy:
+                self.buddy.set_active(True)
+                self.speech.say(f"MoodleClicky {tag} is out. Tray icon -> Update now.", "UPDATE")
+                self.player._job = self.root.after(7000, self.player.stop)
+            log.info("update available: %s", tag)
+        elif announce_up_to_date and not tag:
+            self.speech.say(f"You're on the latest version ({__version__}).", "UP TO DATE", instant=True)
+            self.player._job = self.root.after(4000, self.player.stop)
+
+    def update_clicked(self) -> None:
+        from moodleclicky import updater
+
+        if not self.update_tag:
+            self._check_updates(announce_up_to_date=True)
+        elif updater.can_self_update():
+            updater.run_update()  # the installer closes us, swaps files and relaunches
+        else:
+            self.open_path(updater.RELEASES_PAGE)
+
     def quit(self) -> None:
         nt = self._notetaker
         if nt and nt.session and nt.session.state in ("recording", "paused"):
@@ -400,6 +441,8 @@ class App:
             item("Settings…", lambda: self.call_soon(self.open_settings)),
             item("Open revision notes", lambda: self.call_soon(self.open_notes)),
             pystray.Menu.SEPARATOR,
+            item(lambda _i: f"Update now ({self.update_tag})" if self.update_tag else "Check for updates",
+                 lambda: self.call_soon(self.update_clicked)),
             item("Quit", lambda: self.call_soon(self.quit)),
         )
         self._tray = pystray.Icon(APP_NAME, tray_image(self.settings.buddy_color),
@@ -480,6 +523,7 @@ def main() -> None:
     app = box["app"] = App(root, settings)
     if not has_key(settings):
         root.after(500, app.open_settings)
+    app.start_update_checks()
     log.info("%s %s running. %s = ask, %s = show/hide, %s = notetaker.", APP_NAME, __version__,
              settings.hotkey_ask, settings.hotkey_toggle, settings.hotkey_notes)
     root.mainloop()

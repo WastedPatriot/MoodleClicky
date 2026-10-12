@@ -190,6 +190,12 @@ def main(out=None):
     assert b.state == "showing" and b.title.cget("text") == SAMPLE["title"]
     b.close()
 
+    # update available -> the buddy says so once; tray item becomes "Update now (vX)"
+    app._update_result("v99.0.0", False)
+    pump(root, 0.3)
+    assert app.update_tag == "v99.0.0" and app.speech.visible
+    app.player.stop()
+
     root.destroy()
     print("ui_smoke OK")
 

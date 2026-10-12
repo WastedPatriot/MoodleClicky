@@ -2,6 +2,7 @@
 #
 #   Install or update (paste into PowerShell):
 #     irm https://raw.githubusercontent.com/WastedPatriot/MoodleClicky/main/install.ps1 | iex
+#   Update quietly (keeps settings): tray icon -> "Update now"  (runs this script with -Update)
 #   Re-run just the setup menu:   Start menu -> "MoodleClicky Setup"
 #   Uninstall:                    Start menu -> "Uninstall MoodleClicky"
 #
@@ -9,6 +10,7 @@
 # transcripts live in %APPDATA%\MoodleClicky and are kept across updates.
 param(
     [switch]$Setup,      # only show the setup menu
+    [switch]$Update,     # reinstall the latest release, keep settings, no questions
     [switch]$Uninstall,
     [string]$Zip = ""    # install from a local MoodleClicky-windows.zip instead of downloading
 )
@@ -263,6 +265,14 @@ function Uninstall-App {
 try {
     if ($Uninstall) {
         Uninstall-App
+    } elseif ($Update) {
+        Banner
+        Say "  Updating MoodleClicky..." DarkGray
+        Install-App
+        if (-not (Read-CurrentSettings)) { Show-SetupMenu }  # first install: ask the questions after all
+        Start-AppNow
+        Say "  Updated! This window closes in a few seconds." Green
+        Start-Sleep -Seconds 4
     } elseif ($Setup) {
         if (-not (Test-Path $Exe)) { throw "MoodleClicky isn't installed yet - run the install command first." }
         Show-SetupMenu

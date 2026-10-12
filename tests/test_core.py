@@ -419,3 +419,19 @@ def test_speech_plan_lines():
     assert len(plain("word " * 200)) <= MAX_CHARS + 1
     err = plan_lines(parse_explanation(json.dumps(SAMPLE), None).__class__.failed("No key"))
     assert len(err) == 1 and err[0].tag == "HMM"
+
+
+def test_update_check():
+    from moodleclicky import __version__, updater
+
+    assert updater.parse_version("v0.10.2") == (0, 10, 2) and updater.parse_version("") == (0,)
+    assert updater.is_newer("v99.0.0") and not updater.is_newer(f"v{__version__}")
+    assert not updater.is_newer("v0.1.0")
+    assert updater.check(lambda: {"tag_name": "v99.1.0"}) == "v99.1.0"
+    assert updater.check(lambda: {"tag_name": f"v{__version__}"}) is None
+
+    def offline():
+        raise OSError("no internet")
+
+    assert updater.check(offline) is None  # never bothers you when offline
+    assert not updater.can_self_update()  # tests aren't the installed Windows app

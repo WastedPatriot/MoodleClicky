@@ -53,6 +53,7 @@ class Settings:
     buddy_color: str = "#2f80ed"
     open_on_answer: bool = False  # False = walk through the steps first
     save_notes: bool = True
+    check_updates: bool = True  # look for a newer release on GitHub once a day
     course_context: str = ""  # e.g. "Birkbeck BSc Computer Science, Year 2"
     max_image_edge: int = 1568
     # Lecture / meeting notetaker (see moodleclicky/lecture)

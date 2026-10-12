@@ -145,11 +145,14 @@ class SettingsWindow:
             t.form_row(h.body, label, lambda p, k=key: t.Field(p, self.hk[k]), pady=(0, 8))
 
         # -- Notes
-        nn = t.Card(body, "Revision notes")
+        nn = t.Card(body, "Notes & updates")
         nn.pack(fill="x")
+        self.updates = tk.BooleanVar(w, s.check_updates)
         self.notes = tk.BooleanVar(w, s.save_notes)
         t.Toggle(nn.body, self.notes, "Save every explanation to my notes", "One Markdown file per day").pack(
-            fill="x")
+            fill="x", pady=(0, 10))
+        t.Toggle(nn.body, self.updates, "Tell me when there's an update",
+                 "Checks GitHub once a day. Tray icon -> Update now installs it (settings kept).").pack(fill="x")
 
         w.bind("<Escape>", lambda _e: w.destroy())
         w.update_idletasks()
@@ -181,6 +184,7 @@ class SettingsWindow:
         s.buddy_color = self.color.get().strip() or s.buddy_color
         s.open_on_answer = self.open_answer.get()
         s.save_notes = self.notes.get()
+        s.check_updates = self.updates.get()
         s.start_with_windows = self.autostart.get()
         s.record_mic = self.rec_mic.get()
         s.record_system = self.rec_system.get()

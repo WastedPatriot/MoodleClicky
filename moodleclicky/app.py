@@ -543,7 +543,7 @@ class App:
 
     def _start_hotkeys(self) -> None:
         try:
-            from pynput import keyboard
+            from moodleclicky.triggers import Hotkeys
 
             s = self.settings
             keys = {}
@@ -553,9 +553,9 @@ class App:
                               (s.hotkey_notes, self.open_notetaker), (s.hotkey_mark, self.mark_moment)):
                 if combo and combo not in keys:
                     keys[combo] = lambda fn=fn: self.call_soon(fn)
-            self._hotkeys = keyboard.GlobalHotKeys(keys)
-            self._hotkeys.daemon = True
+            self._hotkeys = Hotkeys(keys)  # matches physical keys, so AltGr layouts (UK) work too
             self._hotkeys.start()
+            log.info("hotkeys ready: %s", ", ".join(keys))
         except Exception:  # bad hotkey string or no keyboard hook available
             log.exception("hotkeys disabled")
             self._hotkeys = None
@@ -569,6 +569,7 @@ class App:
             self._trigger = KeyTrigger(
                 self.settings.trigger, self._fired,
                 on_tap=lambda n: self.call_soon(lambda: self._tap_heard(n)),
+                on_extra=(self._extra_fired if self.settings.triple_ask else None),
                 on_escape=lambda: self.call_soon(self.dismiss),
                 on_hold_start=(lambda: self.call_soon(self.listen_start)) if voice else None,
                 on_hold_end=(lambda: self.call_soon(self.listen_stop)) if voice else None,
@@ -582,6 +583,10 @@ class App:
     def _fired(self) -> None:
         log.info("wake-up key fired")
         self.call_soon(self.on_trigger)
+
+    def _extra_fired(self) -> None:
+        log.info("extra tap: ask a question")
+        self.call_soon(self.start_prompt)
 
     def _start_tray(self) -> None:
         try:

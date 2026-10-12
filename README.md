@@ -94,17 +94,18 @@ The model **must be able to see images**: `qwen2.5vl`, `gemma3`, `llama3.2-visio
 ### Talking to it
 
 - **Say it:** hold **Ctrl**, ask your question out loud ("why is this one quadratic?"), and let go. Your voice is turned into text on your PC and never uploaded. The buddy looks at your screen and answers in the bubble.
-- **Type it:** press **Ctrl + Alt + Q**. A one-line box opens next to the buddy. Type, then press Enter.
+- **Type it:** **triple-tap Ctrl** (or press **Ctrl + Alt + Q**). A one-line box opens next to the buddy. Type, then press Enter.
 
 | Keys | |
 |---|---|
 | **Ctrl ×2** | Look at what's under the mouse and explain it |
 | **Copilot key** | Same, with one press (laptops that have one) |
+| **Ctrl ×3** | Ask a question: a small box by the buddy (type, or hold Ctrl and say it) |
 | **Hold Ctrl** and talk | Ask a question out loud; let go when you're done |
 | **Ctrl ×2** again (while it's talking) | Type the suggestion into the box you were in. Ctrl+Z undoes it |
 | **Ctrl + Alt + A** | Move your mouse onto the answer (the right option, the box, the line). It never clicks |
 | **Esc** | Hide the speech bubble |
-| **Ctrl + Alt + Q** | Type a question in a small box by the buddy |
+| **Ctrl + Alt + Q** | Same as Ctrl ×3 |
 | **Ctrl + Alt + N** | Lecture / meeting notetaker |
 | **Ctrl + Alt + M** | Mark "this bit matters" while recording |
 | **Ctrl + Alt + H** | Show / hide the buddy |

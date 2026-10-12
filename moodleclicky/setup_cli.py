@@ -13,7 +13,7 @@ from moodleclicky.config import EFFORTS, PROVIDERS, WHISPER_MODELS, Settings, da
 from moodleclicky.triggers import TRIGGERS
 
 ENV = "MOODLECLICKY_SETUP"
-BOOL_FIELDS = ("start_with_windows", "record_mic", "record_system", "buddy_visible", "instant")
+BOOL_FIELDS = ("start_with_windows", "record_mic", "record_system", "buddy_visible", "instant", "triple_ask")
 TEXT_FIELDS = ("your_name", "course_context", "custom_url", "custom_model")
 
 

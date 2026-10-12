@@ -281,7 +281,7 @@ start_app() {
   say "  $(c 1 'Ctrl, Ctrl')          look at what's under your mouse (again = type the suggestion)"
   say "  $(c 1 'Hold Ctrl + talk')    ask a question out loud"
   say "  $(c 1 'Ctrl + Alt + A')      move your mouse onto the answer"
-  say "  $(c 1 'Ctrl + Alt + Q')      type a question"
+  say "  $(c 1 'Ctrl x3')             type a question (or Ctrl + Alt + Q)"
   say "  $(c 1 'Ctrl + Alt + N')      lecture / meeting notetaker"
   say ""
   say "Settings later: tray icon → Settings, or run: moodleclicky --setup"

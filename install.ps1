@@ -237,7 +237,7 @@ function Start-AppNow {
     Say "    $wake look at what's under your mouse (again = type the suggestion)"
     Say "    Hold Ctrl + talk     ask a question out loud, let go when done"
     Say "    Ctrl + Alt + A       move your mouse onto the answer"
-    Say "    Ctrl + Alt + Q       type a question first"
+    Say "    Ctrl x3 / Ctrl+Alt+Q type a question first"
     Say "    Ctrl + Alt + N       lecture / meeting notetaker"
     Say "    Ctrl + Alt + M       mark an important moment while recording"
     Say "    Ctrl + Alt + H       show / hide the buddy"

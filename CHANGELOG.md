@@ -2,6 +2,12 @@
 
 All notable changes. Versions match the GitHub Releases that the installer downloads.
 
+## [0.8.2] - 2026-10-12
+### Added
+- **Triple-tap Ctrl to ask a question.** A small box opens by the buddy; type it, or hold Ctrl and say it. Double-tap still looks; it now waits a third of a second to make sure a third tap isn't coming. You can turn this off in Settings.
+### Fixed
+- **Ctrl + Alt + Q (and every other hotkey) did nothing on UK and other AltGr keyboards.** On those layouts Ctrl+Alt is AltGr, so the key arrived as a different character. Hotkeys now match the physical key, and the self-test presses them for real on Windows and Linux.
+
 ## [0.8.1] - 2026-10-12
 ### Changed
 - **Type a question** is now **Ctrl + Alt + Q**. Ctrl + Alt + Space also opens the Claude desktop app's quick entry, so both popped up. Existing settings are moved over automatically; you can pick any key in Settings → Hotkeys.
@@ -83,4 +89,4 @@ All notable changes. Versions match the GitHub Releases that the installer downl
 ### Added
 - First version: the cursor buddy and pop-up with Breakdown / Hint / Check modes, follow-up questions, tray icon, settings, and daily revision notes.
 
-[0.8.1]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.8.1
+[0.8.2]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.8.2

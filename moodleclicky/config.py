@@ -56,6 +56,7 @@ class Settings:
     effort: str = "low"  # low = fastest replies; medium/high think longer
     mode: str = "breakdown"
     trigger: str = "double_ctrl"  # double_ctrl | double_rctrl | triple_ctrl | right_ctrl | hotkey (triggers.py)
+    triple_ask: bool = True  # one more tap than the wake-up key (Ctrl x3) = type or say a question
     instant: bool = True  # look straight away; False = ask "what are you stuck on?" first
     compact: bool = True  # Clicky-style speech bubble by the buddy; False = the full card
     hotkey_ask: str = "<ctrl>+<alt>+q"  # always opens the type-a-question prompt (Ctrl+Alt+Space is Claude's)

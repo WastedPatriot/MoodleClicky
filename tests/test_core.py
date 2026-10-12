@@ -683,3 +683,76 @@ def test_ask_hotkey_moves_off_claudes_ctrl_alt_space(tmp_path):
     from moodleclicky.app import trigger_hint
 
     assert trigger_hint(Settings(trigger="hotkey")) == "Ctrl+Alt+Q"
+
+
+def _tap(d, clock, hold=0.08, gap=0.15):
+    d.watched_down()
+    clock.t += hold
+    d.watched_up()
+    clock.t += gap
+
+
+def test_triple_tap_asks_double_tap_still_looks():
+    from moodleclicky.triggers import DoubleTap
+
+    clock = Clock()
+    got = []
+    d = DoubleTap(lambda: got.append("look"), clock=clock, on_extra=lambda: got.append("ask"),
+                  on_hold_start=lambda: got.append("hold"))
+    for _ in range(3):
+        _tap(d, clock)
+    d.resolve()
+    assert got == ["ask"]  # Ctrl x3: the question box, not a look
+
+    got.clear()
+    clock.t += 2
+    _tap(d, clock)
+    _tap(d, clock, gap=0.0)
+    d.resolve()
+    assert got == []  # too early to know: wait for a possible third tap
+    clock.t += d.extra_wait
+    d.resolve()
+    assert got == ["look"]  # Ctrl x2 then nothing: look
+
+    got.clear()
+    clock.t += 2
+    _tap(d, clock)
+    _tap(d, clock, gap=0.05)
+    d.other_key()  # Ctrl x2 then straight into typing: still a look, right away
+    assert got == ["look"]
+
+    got.clear()
+    clock.t += 2
+    _tap(d, clock)
+    _tap(d, clock, gap=0.05)
+    d.watched_down()
+    clock.t += 0.6
+    d.check_hold()  # Ctrl x2 then hold: push-to-talk only
+    d.watched_up()
+    clock.t += 1
+    d.resolve()
+    assert got == ["hold"]
+
+
+def test_hotkeys_match_physical_keys_so_altgr_layouts_work():
+    from types import SimpleNamespace as K
+
+    from moodleclicky.triggers import Hotkeys, key_ident, parse_combo
+
+    assert parse_combo("<ctrl>+<alt>+q") == (frozenset({"ctrl", "alt"}), "q")
+    assert parse_combo("<ctrl>+<alt>+<space>") == (frozenset({"ctrl", "alt"}), "space")
+    # Windows, UK layout: Ctrl+Alt+Q arrives as vk 0x51 with no/odd char; AltGr reports as alt_gr
+    assert key_ident(K(vk=0x51, char=None), "win32") == "q"
+    assert key_ident(K(vk=0x51, char="\x11"), "win32") == "q"
+    assert key_ident(K(name="alt_gr")) == "alt" and key_ident(K(name="ctrl_l")) == "ctrl"
+    assert key_ident(K(vk=0x61, char="1"), "win32") == "1"  # numpad 1, not 'a'
+    assert key_ident(K(vk=0x71, char="q"), "linux") == "q"  # X11 keysym
+
+    hits = []
+    hk = Hotkeys({"<ctrl>+<alt>+q": lambda: hits.append("ask"), "<ctrl>+<alt>+a": lambda: hits.append("show"),
+                  "<ctrl>+<oops": lambda: hits.append("bad")})
+    hk.press("ctrl"), hk.press("alt"), hk.press("q"), hk.press("q")  # auto-repeat fires once
+    hk.release("q"), hk.press("a")
+    assert hits == ["ask", "show"]
+    hk.release("a"), hk.release("alt"), hk.press("q")  # Ctrl+Q alone isn't ours
+    assert hits == ["ask", "show"]

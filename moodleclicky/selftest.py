@@ -263,6 +263,38 @@ def check_keyboard(root, report: list[str]) -> None:
     trig.stop()
     check(fired == [1], f"Right-Ctrl-only mode fired {len(fired)} times (want 1)")
 
+    got = []
+    trig = KeyTrigger("double_ctrl", lambda: got.append("look"), on_extra=lambda: got.append("ask"))
+    trig.start()
+    time.sleep(0.4)
+    for _ in range(3):  # Ctrl x3 = ask a question
+        kb.press(Key.ctrl_l)
+        time.sleep(0.07)
+        kb.release(Key.ctrl_l)
+        time.sleep(0.15)
+    time.sleep(0.8)
+    check(got == ["ask"], f"triple-tap Ctrl gave {got} (want ask)")
+    double_tap(Key.ctrl_l)  # Ctrl x2 still looks (after a short wait for a third tap)
+    trig.stop()
+    check(got == ["ask", "look"], f"double-tap Ctrl after triple gave {got} (want ask, look)")
+
+    from moodleclicky.triggers import Hotkeys
+
+    hits = []
+    hk = Hotkeys({"<ctrl>+<alt>+q": lambda: hits.append("ask"), "<ctrl>+<alt>+a": lambda: hits.append("show")})
+    hk.start()
+    time.sleep(0.4)
+    with kb.pressed(Key.ctrl_l), kb.pressed(Key.alt_l):
+        kb.press("q")
+        kb.release("q")
+        time.sleep(0.1)
+        kb.press("a")
+        kb.release("a")
+    time.sleep(0.4)
+    hk.stop()
+    check(hits == ["ask", "show"], f"Ctrl+Alt+Q / Ctrl+Alt+A gave {hits}")
+    report.append("ok    Ctrl x3 = ask a question, Ctrl x2 = look; Ctrl+Alt+Q and Ctrl+Alt+A hotkeys")
+
     holds = []
     trig = KeyTrigger("double_ctrl", lambda: holds.append("tap"),
                       on_hold_start=lambda: holds.append("start"), on_hold_end=lambda: holds.append("end"))

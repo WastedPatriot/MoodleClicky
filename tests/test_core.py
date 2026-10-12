@@ -381,7 +381,8 @@ def test_answer_point_and_glide():
     exp = parse_explanation(json.dumps({**SAMPLE, "answer_x": 200, "answer_y": 300}), shot)
     assert exp.answer_point == shot.to_screen(200, 300)
     assert parse_explanation(json.dumps({**SAMPLE, "answer_x": -1, "answer_y": -1}), shot).answer_point is None
-    assert parse_explanation(json.dumps(SAMPLE), shot).answer_point is None  # old replies without it
+    old = {k: v for k, v in SAMPLE.items() if k not in ("answer_x", "answer_y")}
+    assert parse_explanation(json.dumps(old), shot).answer_point is None  # old replies without it
     path = glide_path((0, 0), (300, 120))
     assert path[-1] == (300, 120) and len(path) == 18
     assert all(0 <= x <= 300 and 0 <= y <= 120 for x, y in path)

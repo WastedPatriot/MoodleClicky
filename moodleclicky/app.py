@@ -19,7 +19,14 @@ from moodleclicky.config import Settings, data_dir
 from moodleclicky.settings_ui import SettingsWindow
 from moodleclicky.speech import QuickAsk, SpeechBubble, SpeechPlayer, plan_lines
 from moodleclicky.triggers import KeyTrigger
-from moodleclicky.winutil import SingleInstance, enable_dpi_awareness, focus_window, foreground_window, set_autostart
+from moodleclicky.winutil import (
+    SingleInstance,
+    enable_dpi_awareness,
+    focus_window,
+    foreground_window,
+    session_problem,
+    set_autostart,
+)
 
 log = logging.getLogger(APP_NAME)
 
@@ -321,7 +328,7 @@ class App:
     def _say_briefly(self, text: str, tag: str = "") -> None:
         self.player.stop(quiet=True)
         self.speech.say(text, tag, instant=True)
-        self.player._job = self.root.after(4000, self.player.stop)
+        self.player._job = self.root.after(max(4000, len(text) * 60), self.player.stop)
 
     def ask(self, question: str) -> None:
         if self.busy:
@@ -680,6 +687,10 @@ def main() -> None:
     app = box["app"] = App(root, settings)
     if not has_key(settings):
         root.after(500, app.open_settings)
+    problem = session_problem()
+    if problem:  # Linux on Wayland: say so up front instead of silently ignoring the keys
+        log.warning(problem)
+        root.after(1500, lambda: app._say_briefly(problem, "HEADS UP"))
     app.start_update_checks()
     root.after(15_000, app.preload_voice)
     log.info("%s %s running. %s = ask, %s = show/hide, %s = notetaker.", APP_NAME, __version__,

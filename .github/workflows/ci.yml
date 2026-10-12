@@ -23,7 +23,43 @@ jobs:
       - run: xvfb-run -a -s "-screen 0 1600x900x24" python tests/ui_smoke.py
       - run: xvfb-run -a -s "-screen 0 1600x900x24" python -m moodleclicky --selftest
 
+  linux-install:
+    # The real Linux install path (Parrot / Kali / Debian / Ubuntu): install.sh from this checkout with scripted
+    # answers, the installed app's self-test, launch, then uninstall.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Install with scripted answers (custom / Ollama provider)
+        env:
+          MC_STDIN: "1"
+          XDG_SESSION_TYPE: x11
+        run: |
+          printf '3\n\n\n\nCI\nTest course\n1\n1\nn\ny\ny\n1\n' > answers.txt
+          cd /tmp && xvfb-run -a -s "-screen 0 1366x768x24" bash "$GITHUB_WORKSPACE/install.sh" --from "$GITHUB_WORKSPACE" --yes < "$GITHUB_WORKSPACE/answers.txt"
+      - name: Check saved settings
+        run: |
+          python3 - <<'PY'
+          import json, os
+          c = json.load(open(os.path.expanduser("~/.config/moodleclicky/config.json")))
+          want = {"provider": "custom", "custom_url": "http://localhost:11434/v1", "your_name": "CI",
+                  "trigger": "double_ctrl", "effort": "low", "whisper_model": "tiny.en"}
+          bad = {k: c.get(k) for k in want if c.get(k) != want[k]}
+          assert not bad, bad
+          print("settings OK")
+          PY
+      - name: Installed app self-test (real key events on X11)
+        run: cd /tmp && xvfb-run -a -s "-screen 0 1600x900x24" ~/.local/bin/moodleclicky --selftest
+      - name: Launch stays running, then uninstall
+        run: |
+          cd /tmp
+          xvfb-run -a -s "-screen 0 1366x768x24" bash -c '~/.local/bin/moodleclicky; sleep 12; pgrep -f "venv/bin/python -m moodleclicky"'
+          printf 'n\n' | MC_STDIN=1 ~/.local/bin/moodleclicky --uninstall
+          test ! -e ~/.local/share/moodleclicky && test ! -e ~/.local/bin/moodleclicky && echo "uninstalled"
+
   windows:
+    needs: [linux, linux-install]  # a release is only published if every platform passes
     runs-on: windows-latest
     permissions:
       contents: write  # publish Releases on v* tags

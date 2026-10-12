@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from moodleclicky.brain import APIProblem, make_backend
+from moodleclicky.brain import APIProblem, extract_json, make_backend
 from moodleclicky.config import Settings
 from moodleclicky.lecture.transcribe import Segment, fmt_time
 
@@ -73,7 +73,7 @@ def _ask(settings: Settings, prompt: str, schema: dict, backend=None) -> dict:
     if reply.stop == "refusal":
         raise APIProblem("The AI declined to summarise this.")
     try:
-        data = json.loads(reply.text)
+        data = json.loads(extract_json(reply.text))
     except ValueError as e:
         raise APIProblem("Got a garbled reply - try again." if reply.stop != "max_tokens"
                          else "The notes got cut off - try again.") from e

@@ -548,3 +548,127 @@ def test_transcribe_question():
     assert transcribe_question(tx, quiet) == "why is this quadratic?"
     assert tx.peak > 0.3  # quiet mic boosted before Whisper
     assert transcribe_question(tx, np.zeros(1000, dtype=np.float32)) == ""  # a stray short press
+
+
+def test_custom_llm_local_model():
+    """Ollama-style server: no key needed, fenced JSON + <think> stripped, no JSON mode -> retried without it."""
+    import io
+    import urllib.error
+
+    class Ollama(FakeDeepSeek):
+        def chat(self, payload):
+            if "response_format" in payload:
+                self.payloads.append(payload)
+                raise urllib.error.HTTPError("u", 400, "x", {}, io.BytesIO(b"response_format not supported"))
+            return super().chat(payload)
+
+    reply = "<think>nested loops...</think>\nSure! Here you go:\n```json\n" + json.dumps(SAMPLE) + "\n```"
+    fake = Ollama(reply=reply)
+    s = Settings(provider="custom", custom_url="http://localhost:11434/v1", custom_model="qwen2.5vl:7b")
+    t = Tutor(s, custom_client=fake)
+    assert t.ready
+    exp = t.ask(make_shot(), "help", "breakdown")
+    assert not exp.error and exp.steps[0].point == (2320, 300) and exp.cost_usd == 0
+    assert fake.payloads[0]["response_format"] == {"type": "json_object"}
+    p = fake.payloads[1]
+    assert "response_format" not in p and p["model"] == "qwen2.5vl:7b" and "thinking" not in p
+    assert p["messages"][1]["content"][0]["type"] == "image_url"
+    t.follow_up("why?", "hint")  # history stays valid with the cleaned-up JSON
+
+
+def test_custom_llm_errors_and_address():
+    import io
+    import urllib.error
+
+    from moodleclicky.brain import CustomBackend, OpenAICompatHTTP, has_key
+
+    assert OpenAICompatHTTP("http://localhost:1234/v1/").URL == "http://localhost:1234/v1/chat/completions"
+    assert has_key(Settings(provider="custom")) and not has_key(Settings(provider="custom", custom_url=" "))
+    bad = Tutor(Settings(provider="custom", custom_url="file:///etc/passwd")).ask(make_shot(), "", "hint")
+    assert "http://" in bad.error
+
+    class Down:
+        def chat(self, payload):
+            raise urllib.error.URLError("refused")
+
+    class NoModel:
+        def chat(self, payload):
+            raise urllib.error.HTTPError("u", 404, "x", {}, io.BytesIO(b"model not found"))
+
+    assert "Is Ollama" in Tutor(Settings(provider="custom"), custom_client=Down()).ask(make_shot(), "", "hint").error
+    assert "ollama pull" in Tutor(Settings(provider="custom"), custom_client=NoModel()).ask(
+        make_shot(), "", "hint").error
+    blind = FakeDeepSeek(reply=json.dumps({**SAMPLE, "summary": "I can't see the image you sent."}))
+    assert "vision model" in Tutor(Settings(provider="custom"), custom_client=blind).ask(
+        make_shot(), "", "hint").error
+    assert CustomBackend.name == "custom"
+
+
+def test_parse_tolerates_sloppy_models():
+    sloppy = {"title": "T", "summary": "S", "steps": ["just a string", {"text": "x", "x": "120", "y": 40.6}, 7],
+              "answer": None, "answer_x": "nope"}
+    exp = parse_explanation(json.dumps(sloppy), make_shot())
+    assert [s.text for s in exp.steps] == ["just a string", "x"] and exp.steps[1].point is not None
+    assert exp.answer == "" and exp.answer_point is None
+
+
+def test_keys_fall_back_to_private_file_without_a_keychain(tmp_path, monkeypatch):
+    from moodleclicky import config
+
+    monkeypatch.setenv("MOODLECLICKY_HOME", str(tmp_path))
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(config, "_keyring", lambda: None)
+    assert config.set_api_key(" sk-ant-file ", "anthropic")
+    assert config.get_api_key("anthropic") == "sk-ant-file"
+    f = tmp_path / "keys.json"
+    if sys.platform != "win32":
+        assert (f.stat().st_mode & 0o777) == 0o600  # only you can read it
+    assert config.set_api_key("", "anthropic") and not f.exists()
+
+
+def test_x11_mask_to_rectangles():
+    from moodleclicky.x11shape import mask_rects
+
+    m = Image.new("1", (10, 6), 0)
+    for y in range(1, 4):
+        for x in range(2, 7):
+            m.putpixel((x, y), 1)
+    m.putpixel((8, 5), 1)
+    rects = mask_rects(m)
+    assert sorted(rects) == [(2, 1, 5, 3), (8, 5, 1, 1)]  # one block, merged downwards, plus a dot
+    assert mask_rects(Image.new("1", (4, 4), 0)) == []
+
+
+def test_linux_helpers(monkeypatch):
+    from moodleclicky import updater, winutil
+
+    monkeypatch.setattr(winutil, "IS_LINUX", True)
+    monkeypatch.setenv("XDG_SESSION_TYPE", "wayland")
+    monkeypatch.delenv("MOODLECLICKY_WAYLAND_OK", raising=False)
+    assert "X11" in winutil.session_problem()
+    monkeypatch.setenv("XDG_SESSION_TYPE", "x11")
+    assert winutil.session_problem() == ""
+    monkeypatch.setattr(sys, "prefix", "/home/me/.local/share/moodleclicky/venv")
+    assert updater.installed_by_script()
+    monkeypatch.setattr(sys, "prefix", "/usr")
+    assert not updater.installed_by_script()
+
+
+def test_xdg_autostart(tmp_path, monkeypatch):
+    from moodleclicky import winutil
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    assert winutil._xdg_autostart(True, "MoodleClicky")
+    entry = tmp_path / "autostart" / "moodleclicky.desktop"
+    assert "-m moodleclicky" in entry.read_text() and "[Desktop Entry]" in entry.read_text()
+    assert winutil._xdg_autostart(False, "MoodleClicky") and not entry.exists()
+
+
+def test_setup_saves_custom_server():
+    from moodleclicky.setup_cli import apply_setup
+
+    s = Settings()
+    s.save = lambda: None
+    apply_setup({"provider": "custom", "custom_url": " http://localhost:1234/v1 ", "custom_model": "gemma3"},
+                s, store_key=lambda k, p: True, autostart=lambda on: True)
+    assert (s.provider, s.custom_url, s.custom_model) == ("custom", "http://localhost:1234/v1", "gemma3")

@@ -16,6 +16,7 @@ from moodleclicky import theme as t
 from moodleclicky.brain import Explanation
 from moodleclicky.capture import monitor_bounds
 from moodleclicky.winutil import IS_WIN, make_click_through
+from moodleclicky.x11shape import Shaper
 
 KEY = "#010204"  # transparent colour key (Windows) - outside the rounded shape
 MAX_W = 300
@@ -98,6 +99,7 @@ class SpeechBubble:
         self.font, self.tag_font = f.body, f.tiny_bold
         w.withdraw()
         make_click_through(w)
+        self._shaper = Shaper(w, self.canvas)
         self._tick()
 
     # ---- public --------------------------------------------------------
@@ -169,6 +171,8 @@ class SpeechBubble:
         c.tag_raise(body)
         self._size = (w, h)
         c.config(width=w, height=h)
+        if self.visible:
+            self._shaper.update(w, h)
 
     def _place(self) -> None:
         ax, ay = self.anchor()

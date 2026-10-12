@@ -6,6 +6,7 @@
   <a href="https://github.com/WastedPatriot/MoodleClicky/actions/workflows/ci.yml"><img alt="Build" src="https://github.com/WastedPatriot/MoodleClicky/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <a href="https://github.com/WastedPatriot/MoodleClicky/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/WastedPatriot/MoodleClicky?label=release&color=4f8cff"></a>
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&logoColor=white">
+  <img alt="Linux X11" src="https://img.shields.io/badge/Linux-Parrot%20%7C%20Kali%20%7C%20Debian%20%7C%20Ubuntu-FCC624?logo=linux&logoColor=black">
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white">
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-22c55e"></a>
 </p>
@@ -16,11 +17,13 @@ If you're writing in a text box, it also suggests what goes there. Double-tap ag
 
 <p align="center"><img src="docs/demo.gif" alt="Demo: the cursor buddy explaining a Big-O question step by step" width="88%"></p>
 
-It works with **Claude** or **DeepSeek** (your own API key). It also comes with a **lecture and meeting notetaker** that transcribes on your PC and catches you up when you zone out.
+It runs on **Windows and Linux**, and works with **Claude**, **DeepSeek** or **your own model** (Ollama, LM Studio, OpenRouter… free if it runs on your PC). It also comes with a **lecture and meeting notetaker** that transcribes on your PC and catches you up when you zone out.
 
 ---
 
 ## Install
+
+### Windows
 
 Open **PowerShell** (Start → type *PowerShell* → Enter) and paste:
 
@@ -41,7 +44,46 @@ That one command:
 | **Uninstall** | Start menu → **Uninstall MoodleClicky** (it asks whether to keep your notes) |
 | **Offline install** | `.\install.ps1 -Zip path\to\MoodleClicky-windows.zip` |
 
-You'll need an API key from [console.anthropic.com](https://console.anthropic.com) (Claude) or [platform.deepseek.com](https://platform.deepseek.com) (DeepSeek, cheaper).
+### Linux (Parrot OS, Kali, Debian, Ubuntu, Mint…)
+
+Open a terminal and paste:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/WastedPatriot/MoodleClicky/main/install.sh | bash
+```
+
+It installs the few system packages it needs with `apt` (it asks first), puts everything in `~/.local/share/moodleclicky`, adds a menu entry, and runs the same setup questions. No root install, nothing system-wide besides those packages.
+
+| | |
+|---|---|
+| **Update** | The buddy tells you, then tray → **Update now**. Or run `moodleclicky --update` |
+| **Change settings** | Tray → **Settings**, or `moodleclicky --setup` |
+| **Uninstall** | `moodleclicky --uninstall` |
+
+It needs an **X11** session, which is the default on Parrot, Kali and Mint. On a Wayland desktop (stock Ubuntu/Fedora GNOME), pick *Xorg* on the login screen. Wayland doesn't let apps listen for global keys or take screenshots.
+
+### Which AI?
+
+| | Cost | Setup |
+|---|---|---|
+| **Claude** | ~1¢ per answer | API key from [console.anthropic.com](https://console.anthropic.com) |
+| **DeepSeek** | a fraction of that | API key from [platform.deepseek.com](https://platform.deepseek.com) |
+| **Your own model** | free if local | Any OpenAI-compatible server (see below) |
+
+A Claude.ai / Claude Code subscription (Pro, Team, Enterprise) can't be used here. Apps need an API key, which is billed separately. For no per-answer cost at all, use a local model.
+
+#### Using your own model
+
+Pick **Custom** in Settings (or option 3 in the installer), then choose a preset or type the server address:
+
+| Preset | Address | Notes |
+|---|---|---|
+| Ollama | `http://localhost:11434/v1` | `ollama pull qwen2.5vl:7b`. Free, private, works offline |
+| LM Studio | `http://localhost:1234/v1` | Load a vision model, start the server |
+| OpenRouter | `https://openrouter.ai/api/v1` | One key, hundreds of models |
+| OpenAI / Groq / vLLM / llama.cpp | their `/v1` address | |
+
+The model **must be able to see images**: `qwen2.5vl`, `gemma3`, `llama3.2-vision`, `llava` and similar all work. Smaller models point less precisely than Claude, but they're free. The API key is optional; local servers don't need one.
 
 ## Using it
 
@@ -108,7 +150,8 @@ Only record where you're allowed to, and tell your group first.
 
 - A screenshot is only taken when **you** trigger it. It goes to the AI provider you chose and nowhere else.
 - Lecture audio stays on your PC. Only the text transcript is sent, and only when you ask for notes.
-- API keys live in **Windows Credential Manager**, not in a text file.
+- API keys live in **Windows Credential Manager**, or the Linux keychain (Secret Service). If there's no keychain, they go in a `chmod 600` file only you can read.
+- With a local model, nothing leaves your PC at all.
 - You pay your provider directly. Each answer shows roughly what it cost.
   - With Claude on *Fast* that's usually around a cent.
   - DeepSeek is a fraction of that.
@@ -134,17 +177,19 @@ Ctrl ×2
 |---|---|
 | `moodleclicky/app.py` | Wiring: tray, hotkeys, worker threads → Tk thread |
 | `moodleclicky/triggers.py` | Double-tap detector (ignores Ctrl+C, held Ctrl, typing between taps) |
-| `moodleclicky/brain.py` | Prompt + JSON schema, Claude and DeepSeek backends, streaming, cost |
+| `moodleclicky/brain.py` | Prompt + JSON schema, Claude / DeepSeek / OpenAI-compatible backends, streaming, cost |
 | `moodleclicky/capture.py` | Multi-monitor screenshot, DPI-aware coordinate mapping |
 | `moodleclicky/speech.py` | Speech bubble + the player that walks through the steps |
 | `moodleclicky/buddy.py` | The cursor buddy (follows, flies to targets, grows when active) |
-| `moodleclicky/typer.py` | Types a suggestion into the window you were in |
+| `moodleclicky/typer.py` | Types a suggestion into the window you were in (Ctrl+Shift+V in Linux terminals) |
+| `moodleclicky/x11shape.py` | Linux: see-through, click-through buddy and bubble (XShape) |
+| `moodleclicky/winutil.py` | Platform glue: DPI, autostart (Run key / XDG), focus (Win32 / xdotool) |
 | `moodleclicky/pointer.py` | Glides your mouse onto the answer |
 | `moodleclicky/bubble.py` | Full answer card |
 | `moodleclicky/lecture/` | Recorder (mic + WASAPI loopback), Whisper transcription, crash-safe sessions, notes |
 | `moodleclicky/updater.py` | Checks GitHub Releases, updates in place |
 | `moodleclicky/selftest.py` | `MoodleClicky.exe --selftest`: end-to-end check of an install |
-| `install.ps1` | Installer, setup menu, updater, uninstaller |
+| `install.ps1` / `install.sh` | Windows / Linux installer, setup menu, updater, uninstaller |
 
 </details>
 
@@ -155,7 +200,7 @@ Every push runs the same checks on Linux and on a real **Windows** machine ([CI 
 - **Unit tests** (`pytest`):
   - the double-tap rules (Ctrl+C, held keys, typing between taps)
   - screenshot ↔ screen coordinate maths across monitors
-  - both AI backends, against fakes, including streaming, retries and error messages
+  - all three AI backends, against fakes, including streaming, retries and error messages. The custom backend is also tested against an Ollama-style server with no JSON mode that wraps its reply in `<think>` and code fences
   - the notetaker's recorder, crash recovery and note formats
   - real Whisper transcription of synthesised speech
 - **UI test:** drives the real windows on a virtual screen:
@@ -165,7 +210,9 @@ Every push runs the same checks on Linux and on a real **Windows** machine ([CI 
   - real key events at a relaxed human pace: either Ctrl ×2 wakes it, Ctrl+Shift doesn't, the Copilot key does, holding Ctrl is push-to-talk, and Right-Ctrl-only mode ignores Left Ctrl
   - a suggestion pasted into a real text box
   - the speech bubble, the notetaker, settings, and loading the speech model
-- **Installer test:** installs the fresh build with scripted answers, checks the shortcuts and saved settings, checks the app stays running, then uninstalls.
+- **Installer tests:**
+  - **Windows:** `install.ps1` installs the fresh build with scripted answers, checks the shortcuts and saved settings, checks the app stays running, then uninstalls.
+  - **Linux:** `install.sh` does the same on a clean Ubuntu machine (apt packages, venv, menu entry, custom-model setup), then runs the installed app's self-test with real X11 key events.
 - **Lint and security scan:** `ruff` and `bandit`.
 
 A release is only published if all of that passes.

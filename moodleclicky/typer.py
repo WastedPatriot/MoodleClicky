@@ -10,7 +10,7 @@ import time
 import tkinter as tk
 from collections.abc import Callable
 
-from moodleclicky.winutil import focus_window
+from moodleclicky.winutil import focus_window, is_terminal
 
 
 def type_into(root: tk.Misc, hwnd: int | None, text: str, pause: Callable[[bool], None] = lambda on: None,
@@ -30,13 +30,18 @@ def type_into(root: tk.Misc, hwnd: int | None, text: str, pause: Callable[[bool]
         keyboard = Controller()
     from pynput.keyboard import Key
 
+    terminal = is_terminal(hwnd)  # Linux terminals want Ctrl+Shift+V
     pause(True)
     try:
         focus_window(hwnd)
         time.sleep(0.15)
         with keyboard.pressed(Key.ctrl):
+            if terminal:
+                keyboard.press(Key.shift)
             keyboard.press("v")
             keyboard.release("v")
+            if terminal:
+                keyboard.release(Key.shift)
         time.sleep(0.25)
     finally:
         pause(False)

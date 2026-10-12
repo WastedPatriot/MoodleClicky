@@ -207,7 +207,7 @@ def check_ui(report: list[str]) -> None:
     pump(root, 0.3)
     app._settings_win._save()
     report.append("ok    settings window opens and saves")
-    if sys.platform == "win32":
+    if sys.platform == "win32" or (sys.platform.startswith("linux") and os.environ.get("DISPLAY")):
         report.append("...   keyboard checks (real key events)")
         check_keyboard(root, report)
     root.destroy()
@@ -274,7 +274,8 @@ def check_keyboard(root, report: list[str]) -> None:
     time.sleep(0.4)
     trig.stop()
     check(holds == ["start", "end"], f"holding Ctrl gave {holds} (want start, end)")
-    report.append("ok    double-tap Ctrl (left or right) wakes the buddy; Ctrl+other key doesn't; Copilot key does")
+    report.append("ok    double-tap Ctrl (left or right) wakes the buddy; Ctrl+other key doesn't"
+                  + ("; Copilot key does" if sys.platform == "win32" else ""))
     report.append("ok    Right-Ctrl-only mode ignores Left Ctrl (PowerToys Find My Mouse)")
     report.append("ok    holding Ctrl = push-to-talk (start on hold, stop on release, not a tap)")
 

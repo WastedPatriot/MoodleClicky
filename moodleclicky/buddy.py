@@ -6,6 +6,7 @@ import math
 import tkinter as tk
 
 from moodleclicky.winutil import IS_WIN, make_click_through
+from moodleclicky.x11shape import Shaper
 
 KEY = "#010203"  # transparent colour key (Windows)
 TIP = (18, 18)  # arrow tip inside the canvas (room around it for the pulse ring)
@@ -23,13 +24,14 @@ class Buddy:
         if IS_WIN:
             self.win.config(bg=KEY)
             self.win.attributes("-transparentcolor", KEY)
-        # Without a transparent colour key (macOS/Linux) the window is a small box in `bg`.
+        # Linux/X11: the window is cut to the drawing instead (x11shape); elsewhere it's a small box in `bg`.
         self.canvas = tk.Canvas(self.win, width=BASE_W, height=BASE_H, bg=KEY if IS_WIN else (bg or "#ffffff"),
                                 highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
         self.size = (BASE_W, BASE_H)
         self.win.geometry(f"{BASE_W}x{BASE_H}+0+0")
         make_click_through(self.win)
+        self._shaper = Shaper(self.win, self.canvas)
 
         self.x, self.y = 0.0, 0.0
         self.target_point: tuple[int, int] | None = None
@@ -93,6 +95,7 @@ class Buddy:
             if self.visible:
                 ox, oy = self._draw()
                 self.win.geometry(f"{self.size[0]}x{self.size[1]}+{int(self.x) - ox}+{int(self.y) - oy}")
+                self._shaper.update(*self.size)
         except tk.TclError:
             return  # window destroyed
         self.root.after(16, self._tick)

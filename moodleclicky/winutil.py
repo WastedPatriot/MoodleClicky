@@ -1,10 +1,24 @@
-"""Windows-only niceties: crisp DPI and click-through overlay windows. No-ops elsewhere."""
+"""Platform glue: DPI, click-through overlays, start-at-login, whose window has the keyboard.
+
+Windows uses the Win32 API; Linux (X11) uses XShape (x11shape.py), xdotool and an XDG autostart entry.
+"""
 
 from __future__ import annotations
 
 import sys
 
 IS_WIN = sys.platform == "win32"
+IS_LINUX = sys.platform.startswith("linux")
+
+
+def session_problem() -> str:
+    """'' if global hotkeys/screenshots can work here, else a plain-English reason (Linux on Wayland)."""
+    import os
+
+    if IS_LINUX and os.environ.get("XDG_SESSION_TYPE") == "wayland" and not os.environ.get("MOODLECLICKY_WAYLAND_OK"):
+        return ("You're in a Wayland session. MoodleClicky needs X11 for its global keys and screenshots: "
+                "log out, click the gear on the login screen and pick an Xorg / X11 session.")
+    return ""
 
 
 def enable_dpi_awareness() -> None:
@@ -25,6 +39,12 @@ def enable_dpi_awareness() -> None:
 def make_click_through(widget) -> None:
     """Let mouse clicks pass straight through a window (used for the buddy sprite)."""
     if not IS_WIN:
+        from moodleclicky.x11shape import click_through
+
+        try:
+            click_through(widget)
+        except Exception:  # nosec B110 - no X11 shape extension: clicks just land on the buddy
+            pass
         return
     import ctypes
 
@@ -64,12 +84,35 @@ def launch_command() -> str:
 
     if getattr(sys, "frozen", False):
         return f'"{sys.executable}"'
+    if not IS_WIN:
+        return f'"{sys.executable}" -m moodleclicky'
     exe = sys.executable
     pyw = os.path.join(os.path.dirname(exe), "pythonw.exe")
     return f'"{pyw if os.path.exists(pyw) else exe}" -m moodleclicky'
 
 
+def _xdg_autostart(enabled: bool, name: str) -> bool:
+    import os
+    from pathlib import Path
+
+    folder = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "autostart"
+    entry = folder / f"{name.lower()}.desktop"
+    try:
+        if enabled:
+            folder.mkdir(parents=True, exist_ok=True)
+            entry.write_text(f"[Desktop Entry]\nType=Application\nName={name}\nExec={launch_command()}\n"
+                             "Icon=moodleclicky\nX-GNOME-Autostart-enabled=true\nTerminal=false\n",
+                             encoding="utf-8")
+        else:
+            entry.unlink(missing_ok=True)
+        return True
+    except OSError:
+        return False
+
+
 def set_autostart(enabled: bool, name: str = "MoodleClicky") -> bool:
+    if IS_LINUX:
+        return _xdg_autostart(enabled, name)
     if not IS_WIN:
         return False
     import winreg
@@ -132,6 +175,9 @@ class SingleInstance:
 # ---- whose window has the keyboard ---------------------------------------------
 def foreground_window() -> int | None:
     """Handle of the window you were typing in (so we can give focus back / type into it)."""
+    if IS_LINUX:
+        out = _xdotool("getactivewindow")
+        return int(out) if out.isdigit() else None
     if not IS_WIN:
         return None
     import ctypes
@@ -142,7 +188,46 @@ def foreground_window() -> int | None:
         return None
 
 
+def _xdotool(*args: str) -> str:
+    """Run xdotool if it's installed (Linux); '' otherwise."""
+    import shutil
+    import subprocess  # nosec B404 - fixed program, no shell
+
+    exe = shutil.which("xdotool")
+    if not exe:
+        return ""
+    try:
+        return subprocess.run([exe, *args], capture_output=True, text=True, timeout=2).stdout.strip()  # nosec B603
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+TERMINALS = ("terminal", "xterm", "konsole", "terminator", "tilix", "alacritty", "kitty", "urxvt", "rxvt",
+             "terminology", "wezterm", "foot", "guake", "yakuake", "st-256color", "sakura", "lxterm", "qterminal")
+
+
+def is_terminal(hwnd: int | None) -> bool:
+    """Linux terminals paste with Ctrl+Shift+V, not Ctrl+V."""
+    if not (IS_LINUX and hwnd):
+        return False
+    import shutil
+    import subprocess  # nosec B404 - fixed program, no shell
+
+    exe = shutil.which("xprop")
+    if not exe:
+        return False
+    try:
+        cls = subprocess.run([exe, "-id", str(int(hwnd)), "WM_CLASS"], capture_output=True, text=True,  # nosec B603
+                             timeout=2).stdout.lower()
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return any(t in cls for t in TERMINALS)
+
+
 def focus_window(hwnd: int | None) -> bool:
+    if IS_LINUX and hwnd:
+        _xdotool("windowactivate", str(int(hwnd)))
+        return True
     if not (IS_WIN and hwnd):
         return False
     import ctypes

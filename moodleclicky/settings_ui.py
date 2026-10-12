@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import sys
 import tkinter as tk
 from collections.abc import Callable
 
 from moodleclicky import theme as t
 from moodleclicky.brain import PRICES
 from moodleclicky.config import (
+    CUSTOM_PRESETS,
     DEFAULT_MODELS,
     EFFORTS,
     MODE_LABELS,
@@ -22,6 +24,7 @@ from moodleclicky.triggers import TRIGGER_LABELS, TRIGGERS
 KEY_HINTS = {
     "anthropic": "Get one at console.anthropic.com → API keys (starts with sk-ant-).",
     "deepseek": "Get one at platform.deepseek.com → API keys. Cheaper; needs a vision model.",
+    "custom": "Only if your server needs one (OpenRouter, OpenAI, Groq). Leave empty for Ollama / LM Studio.",
 }
 
 
@@ -57,16 +60,35 @@ class SettingsWindow:
         # -- AI provider
         a = t.Card(body, "AI provider", "Use your own key. Each answer shows roughly what it cost.")
         a.pack(fill="x", pady=(0, 10))
-        if not get_api_key(s.provider):
-            tk.Label(a.body, text="👋  Paste a Claude or DeepSeek API key below to get started, then press Save.",
+        if s.provider != "custom" and not get_api_key(s.provider):
+            tk.Label(a.body, text="👋  Paste a Claude or DeepSeek API key below, or pick Custom to use your own "
+                                  "model (free with Ollama), then press Save.",
                      bg=t.ACCENT_LO, fg=t.INK, font=f.small, anchor="w", justify="left", wraplength=420,
                      padx=10, pady=8).pack(fill="x", pady=(0, 12))
         self.provider = tk.StringVar(w, s.provider)
-        t.Segmented(a.body, [("anthropic", "Claude"), ("deepseek", "DeepSeek")], variable=self.provider,
-                    command=lambda _v: self._show_provider()).pack(anchor="w", pady=(0, 12))
-        self.keys = {p: tk.StringVar(w, get_api_key(p)) for p in ("anthropic", "deepseek")}
-        self.models = {"anthropic": tk.StringVar(w, s.model), "deepseek": tk.StringVar(w, s.deepseek_model)}
+        t.Segmented(a.body, [("anthropic", "Claude"), ("deepseek", "DeepSeek"), ("custom", "Custom")],
+                    variable=self.provider, command=lambda _v: self._show_provider(), width=300).pack(
+            anchor="w", pady=(0, 12))
+        self.keys = {p: tk.StringVar(w, get_api_key(p)) for p in ("anthropic", "deepseek", "custom")}
+        self.models = {"anthropic": tk.StringVar(w, s.model), "deepseek": tk.StringVar(w, s.deepseek_model),
+                       "custom": tk.StringVar(w, s.custom_model)}
         self.provider_frames = {}
+        # Custom: any OpenAI-compatible server (Ollama, LM Studio, OpenRouter, OpenAI, Groq…)
+        cf = tk.Frame(a.body, bg=t.CARD)
+        self.custom_url = tk.StringVar(w, s.custom_url)
+        self.preset = tk.StringVar(w, next((k for k, (u, _m) in CUSTOM_PRESETS.items() if u == s.custom_url),
+                                           "Pick a preset…"))
+        t.form_row(cf, "Preset", lambda par: t.combobox(par, self.preset, list(CUSTOM_PRESETS), readonly=True))
+        self.preset.trace_add("write", lambda *_a: self._pick_preset())
+        t.form_row(cf, "Server address", lambda par: t.Field(par, self.custom_url,
+                   placeholder="http://localhost:11434/v1"),
+                   hint="Anything that speaks the OpenAI chat API. Free and private with Ollama on this PC.")
+        t.form_row(cf, "Model", lambda par: t.Field(par, self.models["custom"], placeholder="qwen2.5vl:7b"),
+                   hint="Must be able to see images: qwen2.5vl, gemma3, llama3.2-vision, llava…")
+        t.form_row(cf, "API key (optional)", lambda par: t.Field(par, self.keys["custom"], show="•", eye=True,
+                                                                placeholder="not needed for local models"),
+                   hint=KEY_HINTS["custom"])
+        self.provider_frames["custom"] = cf
         for p, label in (("anthropic", "Claude"), ("deepseek", "DeepSeek")):
             fr = tk.Frame(a.body, bg=t.CARD)
             t.form_row(fr, f"{label} API key", lambda par, p=p: t.Field(par, self.keys[p], show="•", eye=True,
@@ -123,8 +145,8 @@ class SettingsWindow:
         self.color = tk.StringVar(w, s.buddy_color)
         t.form_row(g.body, "Buddy colour", lambda p: t.Field(p, self.color, placeholder="#2f80ed"))
         self.autostart = tk.BooleanVar(w, s.start_with_windows)
-        t.Toggle(g.body, self.autostart, "Start with Windows", "Sits quietly in the tray after you log in").pack(
-            fill="x")
+        start_label = "Start with Windows" if sys.platform == "win32" else "Start when I log in"
+        t.Toggle(g.body, self.autostart, start_label, "Sits quietly in the tray after you log in").pack(fill="x")
 
         # -- Notetaker
         n = t.Card(body, "Lecture notetaker", "Records, transcribes on this PC, then the AI makes notes.")
@@ -170,6 +192,13 @@ class SettingsWindow:
         self.scroll = scroll
         w.focus_force()
 
+    def _pick_preset(self) -> None:
+        url, model = CUSTOM_PRESETS.get(self.preset.get(), ("", ""))
+        if url:
+            self.custom_url.set(url)
+            if model:
+                self.models["custom"].set(model)
+
     def _show_provider(self) -> None:
         for fr in self.provider_frames.values():
             fr.pack_forget()
@@ -184,7 +213,9 @@ class SettingsWindow:
         s.compact = self.compact.get()
         label_to_mode = {v: k for k, v in MODE_LABELS.items()}
         s.mode = label_to_mode.get(self.mode.get(), "breakdown")
-        s.provider = self.provider.get() if self.provider.get() in ("anthropic", "deepseek") else "anthropic"
+        s.provider = self.provider.get() if self.provider.get() in ("anthropic", "deepseek", "custom") else "anthropic"
+        s.custom_url = self.custom_url.get().strip() or s.custom_url
+        s.custom_model = self.models["custom"].get().strip() or DEFAULT_MODELS["custom"]
         s.model = self.models["anthropic"].get().strip() or DEFAULT_MODELS["anthropic"]
         s.deepseek_model = self.models["deepseek"].get().strip() or DEFAULT_MODELS["deepseek"]
         s.effort = self.effort.get() if self.effort.get() in EFFORTS else "low"

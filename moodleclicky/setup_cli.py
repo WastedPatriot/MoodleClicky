@@ -1,4 +1,4 @@
-"""`MoodleClicky.exe --apply-setup`: save the answers from the install menu (install.ps1), no window.
+"""`MoodleClicky.exe --apply-setup`: save the answers from the install menu (install.ps1 / install.sh), no window.
 
 The installer passes everything through the MOODLECLICKY_SETUP environment variable (JSON), so the API key
 never appears on a command line. Exit code 0 = saved. A short report goes to %APPDATA%\\MoodleClicky\\setup.log.
@@ -14,7 +14,7 @@ from moodleclicky.triggers import TRIGGERS
 
 ENV = "MOODLECLICKY_SETUP"
 BOOL_FIELDS = ("start_with_windows", "record_mic", "record_system", "buddy_visible", "instant")
-TEXT_FIELDS = ("your_name", "course_context")
+TEXT_FIELDS = ("your_name", "course_context", "custom_url", "custom_model")
 
 
 def apply_setup(payload: dict, settings: Settings | None = None, store_key=set_api_key, autostart=None) -> list[str]:
@@ -28,7 +28,7 @@ def apply_setup(payload: dict, settings: Settings | None = None, store_key=set_a
     key = (payload.get("api_key") or "").strip()
     if key:
         if not store_key(key, s.provider):
-            raise RuntimeError("Couldn't save the API key to Windows Credential Manager")
+            raise RuntimeError("Couldn't save the API key (keychain and fallback file both failed)")
         done.append(f"{s.provider} API key saved (…{key[-4:]})")
     for f in TEXT_FIELDS:
         if f in payload:

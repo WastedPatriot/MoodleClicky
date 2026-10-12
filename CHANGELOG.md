@@ -2,6 +2,16 @@
 
 All notable changes. Versions match the GitHub Releases that the installer downloads.
 
+## [0.8.0] - 2026-10-12
+### Added
+- **Linux** (Parrot OS, Kali, Debian, Ubuntu, Mint… on X11): one-line installer `install.sh` with the same setup menu, menu entry, start-at-login, self-update and uninstall.
+  - The buddy and speech bubble are cut to shape with XShape, so they're see-through and click-through like on Windows.
+  - Typing help knows terminals paste with Ctrl+Shift+V.
+  - API keys go in the Secret Service keychain, or a private `chmod 600` file if there isn't one.
+  - On Wayland it tells you to switch to an X11 session instead of silently ignoring your keys.
+- **Custom / local AI:** any OpenAI-compatible server, such as Ollama, LM Studio, vLLM or llama.cpp on your own PC (free and private), or OpenRouter, OpenAI and Groq. There are presets in Settings and in both installers. Replies from smaller models are cleaned up (```json fences, `<think>` blocks, loose types).
+- CI installs and self-tests on a fresh Ubuntu machine too, and a release now needs Linux and Windows to pass.
+
 ## [0.7.0] - 2026-10-12
 ### Changed
 - **Waking it up is more forgiving.** The default is now double-tap **either** Ctrl, with relaxed timing, so an unhurried double-tap counts. If you were on the old Right-Ctrl-only default, you're moved over automatically. PowerToys *Find My Mouse* users can still pick "Right Ctrl ×2" in Settings.
@@ -69,6 +79,7 @@ All notable changes. Versions match the GitHub Releases that the installer downl
 ### Added
 - First version: the cursor buddy and pop-up with Breakdown / Hint / Check modes, follow-up questions, tray icon, settings, and daily revision notes.
 
+[0.8.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.8.0
 [0.7.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.7.0
 [0.6.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.6.0
 [0.5.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.5.0

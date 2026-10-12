@@ -63,7 +63,7 @@ def main():
     d.text((716, 218), "Double-tap Ctrl: it looks, points, explains.", font=sub, fill=MUTED)
     pill = font(["DejaVuSans-Bold.ttf", "segoeuib.ttf"], 15)
     x = 716
-    for label in ("Windows", "Claude / DeepSeek", "Lecture notetaker"):
+    for label in ("Windows · Linux", "Claude · DeepSeek · local", "Notetaker"):
         tw = d.textlength(label, font=pill)
         d.rounded_rectangle((x, 274, x + tw + 24, 306), radius=16, fill=(38, 39, 46), outline=(56, 58, 67))
         d.text((x + 12, 281), label, font=pill, fill=INK)

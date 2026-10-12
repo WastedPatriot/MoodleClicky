@@ -1,4 +1,4 @@
-"""Checks GitHub for a newer release and updates in place (Windows installer, settings kept)."""
+"""Checks GitHub for a newer release and updates in place (install.ps1 / install.sh, settings kept)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ REPO = "WastedPatriot/MoodleClicky"
 LATEST_API = f"https://api.github.com/repos/{REPO}/releases/latest"
 RELEASES_PAGE = f"https://github.com/{REPO}/releases/latest"
 INSTALL_SCRIPT = f"https://raw.githubusercontent.com/{REPO}/main/install.ps1"
+INSTALL_SH = f"https://raw.githubusercontent.com/{REPO}/main/install.sh"
 
 
 def parse_version(v: str) -> tuple[int, ...]:
@@ -41,13 +42,29 @@ def check(fetch=fetch_latest) -> str | None:
     return tag if tag and is_newer(tag) else None
 
 
+def installed_by_script() -> bool:
+    """Linux: running from the venv that install.sh made (~/.local/share/moodleclicky/venv)."""
+    from pathlib import Path
+
+    return Path(sys.prefix).name == "venv" and Path(sys.prefix).parent.name == "moodleclicky"
+
+
 def can_self_update() -> bool:
-    """Only the installed Windows app updates itself; from source you `git pull`."""
+    """The installed app updates itself; from a git checkout you `git pull`."""
+    if sys.platform.startswith("linux"):
+        return installed_by_script()
     return sys.platform == "win32" and bool(getattr(sys, "frozen", False))
 
 
 def run_update() -> None:
-    """Start the installer in update mode in its own window; it closes this app, swaps files, relaunches."""
+    """Start the installer in update mode; it closes this app, swaps files, relaunches."""
+    if sys.platform.startswith("linux"):
+        from moodleclicky.config import data_dir
+
+        log = open(data_dir() / "update.log", "w")  # noqa: SIM115 - handed to the child process
+        subprocess.Popen(["bash", "-c", f'curl -fsSL "{INSTALL_SH}" | bash -s -- --update'],  # nosec B603 B607
+                         stdout=log, stderr=log, stdin=subprocess.DEVNULL, start_new_session=True)
+        return
     cmd = f"& ([scriptblock]::Create((irm '{INSTALL_SCRIPT}'))) -Update"
     flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
     subprocess.Popen(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cmd],  # nosec B603 B607

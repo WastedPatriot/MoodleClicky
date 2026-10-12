@@ -116,28 +116,50 @@ class Explanation:
         return cls(title="Hmm, that didn't work", summary=msg, error=msg)
 
 
+def extract_json(text: str) -> str:
+    """The JSON object in a reply, minus anything a smaller/local model wraps it in (```json fences,
+    <think>...</think> reasoning, a sentence before or after)."""
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+    start, end = text.find("{"), text.rfind("}")
+    return text[start:end + 1] if start != -1 and end > start else text
+
+
+def _str(v) -> str:
+    return v.strip() if isinstance(v, str) else ("" if v is None else str(v))
+
+
 def parse_explanation(text: str, shot: Shot | None) -> Explanation:
-    data = json.loads(text)
+    data = json.loads(extract_json(text))
+    if not isinstance(data, dict):
+        raise ValueError("reply is not a JSON object")
     steps = []
-    for s in data.get("steps", []):
-        pt = shot.to_screen(s["x"], s["y"]) if shot and s.get("x", -1) >= 0 and s.get("y", -1) >= 0 else None
-        steps.append(Step(s.get("text", "").strip(), s.get("label", "").strip(), pt))
+    for s in data.get("steps") or []:
+        if isinstance(s, str):  # small models sometimes send plain strings
+            s = {"text": s}
+        if not isinstance(s, dict):
+            continue
+        pt = _point(s.get("x", -1), s.get("y", -1), shot)
+        steps.append(Step(_str(s.get("text")), _str(s.get("label")), pt))
     return Explanation(
-        title=data.get("title", "").strip() or "Here's what I see",
-        summary=data.get("summary", "").strip(),
+        title=_str(data.get("title")) or "Here's what I see",
+        summary=_str(data.get("summary")),
         steps=steps,
-        answer=data.get("answer", "").strip(),
-        why=data.get("why", "").strip(),
-        check_yourself=data.get("check_yourself", "").strip(),
+        answer=_str(data.get("answer")),
+        why=_str(data.get("why")),
+        check_yourself=_str(data.get("check_yourself")),
         type_text=(data.get("type_text") or "").strip("\n"),
         answer_point=_point(data.get("answer_x", -1), data.get("answer_y", -1), shot),
     )
 
 
 def _point(x, y, shot: Shot | None) -> tuple[int, int] | None:
-    if shot is None or not isinstance(x, int | float) or not isinstance(y, int | float) or x < 0 or y < 0:
+    try:
+        x, y = float(x), float(y)
+    except (TypeError, ValueError):
         return None
-    return shot.to_screen(x, y)
+    if shot is None or x < 0 or y < 0 or x > shot.width * 1.05 or y > shot.height * 1.05:
+        return None
+    return shot.to_screen(round(x), round(y))
 
 
 _PARTIAL_KEYS = ("title", "summary", "type_text")
@@ -280,7 +302,7 @@ class DeepSeekHTTP:
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=300) as resp:  # nosec B310 - fixed https URL
+        with urllib.request.urlopen(req, timeout=300) as resp:  # nosec B310 - http(s) only, checked above
             return json.loads(resp.read().decode("utf-8"))
 
 
@@ -385,13 +407,86 @@ class DeepSeekBackend:
         return text, stop, cost
 
 
-def make_backend(settings: Settings, claude_client=None, deepseek_client=None):
+class OpenAICompatHTTP(DeepSeekHTTP):
+    """Any OpenAI-compatible server: Ollama, LM Studio, vLLM, llama.cpp, OpenRouter, OpenAI, Groq…"""
+
+    def __init__(self, base_url: str, api_key: str = ""):
+        base = (base_url or "").strip().rstrip("/")
+        if not base.startswith(("http://", "https://")):
+            raise APIProblem("Your custom AI address must start with http:// or https:// (Settings -> AI provider).")
+        self.URL = base if base.endswith("/chat/completions") else base + "/chat/completions"
+        self.api_key = api_key or "none"  # local servers don't check it, but some want the header
+
+
+class CustomBackend(DeepSeekBackend):
+    """Your own model. No thinking/effort knobs (servers differ); JSON mode if the server supports it."""
+
+    name = "custom"
+
+    def __init__(self, base_url: str, api_key: str = "", client=None):
+        self.base_url = base_url
+        self._client = client or OpenAICompatHTTP(base_url, api_key)
+
+    def _send(self, payload: dict) -> dict:
+        try:
+            return self._client.chat(payload)
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", "replace")[:300] if hasattr(e, "read") else ""
+            if e.code in (400, 422) and "response_format" in payload:  # server has no JSON mode: ask nicely
+                return self._send({k: v for k, v in payload.items() if k != "response_format"})
+            if e.code in (401, 403):
+                raise APIProblem("Your custom AI rejected the API key. Open Settings -> AI provider.") from e
+            if e.code == 404:
+                raise APIProblem(f"Your custom AI doesn't know the model {payload.get('model')!r}. "
+                                 f"With Ollama: ollama pull {payload.get('model')}") from e
+            if e.code == 429:
+                raise APIProblem("Your custom AI is rate limiting - give it a minute.") from e
+            raise APIProblem(f"Custom AI error {e.code}. {detail}".strip()) from e
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            raise APIProblem(f"Can't reach your custom AI at {self.base_url}. Is Ollama / LM Studio running?") from e
+
+    def chat(self, settings: Settings, system: str, history: list[dict], schema: dict, on_text=None) -> Reply:
+        system = (
+            f"{system}\n\nReply with a single JSON object only (no markdown fences, no other text) with exactly "
+            f"these keys, following this JSON schema:\n{json.dumps(schema)}\nExample shape:\n{json_example(schema)}"
+        )
+        has_image = any(t.get("image") for t in history)
+        payload = {
+            "model": settings.custom_model,
+            "messages": self.to_messages(system, history),
+            "response_format": {"type": "json_object"},
+            "max_tokens": 8000,
+            "temperature": 0.2,
+            "stream": False,
+        }
+        text, stop, _ = self._read(self._send(payload), settings.custom_model)
+        if has_image and looks_blind(text):
+            raise APIProblem(f"{settings.custom_model} can't see screenshots. Pick a vision model in Settings, "
+                             "e.g. qwen2.5vl, gemma3 or llama3.2-vision (Ollama).")
+        return Reply(extract_json(text), None, 0.0, stop)
+
+    @staticmethod
+    def _read(data: dict, model: str) -> tuple[str, str, float]:
+        try:
+            choice = data["choices"][0]
+            text = choice["message"].get("content") or ""
+        except (KeyError, IndexError, TypeError) as e:
+            raise APIProblem("Got an unexpected reply from your custom AI - is it OpenAI-compatible?") from e
+        stop = {"length": "max_tokens", "content_filter": "refusal"}.get(choice.get("finish_reason"), "end")
+        return text, stop, 0.0
+
+
+def make_backend(settings: Settings, claude_client=None, deepseek_client=None, custom_client=None):
+    if settings.provider == "custom":
+        return CustomBackend(settings.custom_url, get_api_key("custom"), custom_client)
     if settings.provider == "deepseek":
         return DeepSeekBackend(get_api_key("deepseek"), deepseek_client)
     return ClaudeBackend(get_api_key("anthropic"), claude_client)
 
 
 def has_key(settings: Settings) -> bool:
+    if settings.provider == "custom":  # local servers need no key, just an address
+        return bool(settings.custom_url.strip())
     return bool(get_api_key(settings.provider))
 
 
@@ -399,10 +494,11 @@ def has_key(settings: Settings) -> bool:
 class Tutor:
     """One conversation per hotkey press; follow-ups continue it (append-only history)."""
 
-    def __init__(self, settings: Settings, client=None, deepseek_client=None):
+    def __init__(self, settings: Settings, client=None, deepseek_client=None, custom_client=None):
         self.settings = settings
         self._claude_client = client  # injected fakes for tests
         self._deepseek_client = deepseek_client
+        self._custom_client = custom_client
         self._backend = None
         self.history: list[dict] = []
         self.shot: Shot | None = None
@@ -410,7 +506,8 @@ class Tutor:
 
     @property
     def ready(self) -> bool:
-        injected = self._deepseek_client if self.settings.provider == "deepseek" else self._claude_client
+        injected = {"deepseek": self._deepseek_client, "custom": self._custom_client}.get(
+            self.settings.provider, self._claude_client)
         return injected is not None or has_key(self.settings)
 
     def reset_backend(self) -> None:
@@ -420,7 +517,8 @@ class Tutor:
     @property
     def backend(self):
         if self._backend is None or self._backend.name != self.settings.provider:
-            self._backend = make_backend(self.settings, self._claude_client, self._deepseek_client)
+            self._backend = make_backend(self.settings, self._claude_client, self._deepseek_client,
+                                         self._custom_client)
         return self._backend
 
     def _mode_line(self, mode: str) -> str:

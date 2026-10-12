@@ -162,13 +162,21 @@ function Show-SetupMenu {
     Say "  Setup - press Enter to keep the value in [brackets]." White
     Say ""
     $cur = Read-CurrentSettings
-    $provIdx = if ($cur -and $cur.provider -eq "deepseek") { 1 } else { 0 }
-    $p = AskChoice "Which AI should explain things?" @("Claude (Anthropic) - best explanations", "DeepSeek - much cheaper") $provIdx
-    $provider = @("anthropic", "deepseek")[$p]
-    $where = if ($provider -eq "anthropic") { "console.anthropic.com -> API keys (starts with sk-ant-)" } else { "platform.deepseek.com -> API keys" }
+    $providers = @("anthropic", "deepseek", "custom")
+    $provIdx = if ($cur -and ($providers -contains $cur.provider)) { [array]::IndexOf($providers, $cur.provider) } else { 0 }
+    $p = AskChoice "Which AI should explain things?" @("Claude (Anthropic) - best explanations", "DeepSeek - much cheaper", "Custom / local - Ollama, LM Studio, OpenRouter... (free if local)") $provIdx
+    $provider = $providers[$p]
+    $customUrl = $null; $customModel = $null
     Say ""
-    Say "  Get a key at: $where" DarkGray
-    $key = AskSecret "Paste your API key (hidden; Enter = keep the saved one)"
+    if ($provider -eq "custom") {
+        $customUrl = Ask "Server address" $(if ($cur -and $cur.custom_url) { $cur.custom_url } else { "http://localhost:11434/v1" })
+        $customModel = Ask "Model (must see images, e.g. qwen2.5vl:7b, gemma3)" $(if ($cur -and $cur.custom_model) { $cur.custom_model } else { "qwen2.5vl:7b" })
+        $key = AskSecret "API key (Enter = none, fine for Ollama / LM Studio)"
+    } else {
+        $where = if ($provider -eq "anthropic") { "console.anthropic.com -> API keys (starts with sk-ant-)" } else { "platform.deepseek.com -> API keys" }
+        Say "  Get a key at: $where" DarkGray
+        $key = AskSecret "Paste your API key (hidden; Enter = keep the saved one)"
+    }
     Say ""
     $name = Ask "Your first name (so group-meeting notes can find YOUR tasks)" $(if ($cur) { $cur.your_name } else { "" })
     $course = Ask "Your course (optional, e.g. Birkbeck BSc Computer Science Y2)" $(if ($cur) { $cur.course_context } else { "" })
@@ -195,6 +203,7 @@ function Show-SetupMenu {
         trigger = $triggers[$tr]; effort = $efforts[$ef]; instant = $true
     }
     if ($key) { $payload.api_key = $key }
+    if ($customUrl) { $payload.custom_url = $customUrl; $payload.custom_model = $customModel }
 
     Step "Saving"
     $env:MOODLECLICKY_SETUP = ($payload | ConvertTo-Json -Compress)

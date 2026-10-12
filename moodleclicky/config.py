@@ -18,9 +18,18 @@ MODE_LABELS = {
 }
 EFFORTS = ("low", "medium", "high")
 WHISPER_MODELS = ("tiny.en", "base.en", "small.en", "medium.en")
-PROVIDERS = ("anthropic", "deepseek")
-PROVIDER_LABELS = {"anthropic": "Claude (Anthropic)", "deepseek": "DeepSeek"}
-DEFAULT_MODELS = {"anthropic": "claude-opus-5-5", "deepseek": "deepseek-flash"}
+PROVIDERS = ("anthropic", "deepseek", "custom")
+PROVIDER_LABELS = {"anthropic": "Claude (Anthropic)", "deepseek": "DeepSeek",
+                   "custom": "Custom / local (OpenAI-compatible)"}
+DEFAULT_MODELS = {"anthropic": "claude-opus-5-5", "deepseek": "deepseek-flash", "custom": "qwen2.5vl:7b"}
+# Any server that speaks the OpenAI /chat/completions API. The model must be able to see images.
+CUSTOM_PRESETS = {
+    "Ollama (this PC, free)": ("http://localhost:11434/v1", "qwen2.5vl:7b"),
+    "LM Studio (this PC, free)": ("http://localhost:1234/v1", ""),
+    "OpenRouter": ("https://openrouter.ai/api/v1", "google/gemini-2.5-flash"),
+    "OpenAI": ("https://api.openai.com/v1", "gpt-4.1-mini"),
+    "Groq": ("https://api.groq.com/openai/v1", "meta-llama/llama-4-scout-17b-16e-instruct"),
+}
 
 
 def data_dir() -> Path:
@@ -42,6 +51,8 @@ class Settings:
     provider: str = "anthropic"  # anthropic | deepseek
     model: str = "claude-opus-5-5"  # Claude model
     deepseek_model: str = "deepseek-flash"  # must be a vision-capable DeepSeek model
+    custom_url: str = "http://localhost:11434/v1"  # OpenAI-compatible base URL (Ollama, LM Studio, OpenRouter…)
+    custom_model: str = "qwen2.5vl:7b"  # must be able to see images
     effort: str = "low"  # low = fastest replies; medium/high think longer
     mode: str = "breakdown"
     trigger: str = "double_ctrl"  # double_ctrl | double_rctrl | triple_ctrl | right_ctrl | hotkey (triggers.py)
@@ -100,7 +111,7 @@ class Settings:
         return s
 
     def active_model(self) -> str:
-        return self.deepseek_model if self.provider == "deepseek" else self.model
+        return {"deepseek": self.deepseek_model, "custom": self.custom_model}.get(self.provider, self.model)
 
     def save(self, path: Path | None = None) -> None:
         path = path or data_dir() / "config.json"
@@ -108,37 +119,92 @@ class Settings:
 
 
 # ---- API keys ------------------------------------------------------------
-# Stored in Windows Credential Manager / macOS Keychain via `keyring`, one per provider.
+# Stored in Windows Credential Manager / macOS Keychain / Linux Secret Service via `keyring`, one per
+# provider; if there is no keychain, in a chmod-600 keys.json in the data folder.
 # ANTHROPIC_API_KEY / DEEPSEEK_API_KEY in the environment always win.
 
 _KR_SERVICE = APP_NAME
-_KR_USER = {"anthropic": "anthropic_api_key", "deepseek": "deepseek_api_key"}
-_ENV = {"anthropic": "ANTHROPIC_API_KEY", "deepseek": "DEEPSEEK_API_KEY"}
+_KR_USER = {"anthropic": "anthropic_api_key", "deepseek": "deepseek_api_key", "custom": "custom_api_key"}
+_ENV = {"anthropic": "ANTHROPIC_API_KEY", "deepseek": "DEEPSEEK_API_KEY", "custom": "MOODLECLICKY_CUSTOM_API_KEY"}
+
+
+def _key_file() -> Path:
+    return data_dir() / "keys.json"
+
+
+def _file_keys() -> dict:
+    try:
+        return json.loads(_key_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _write_file_keys(keys: dict) -> bool:
+    """Fallback when there's no OS keychain (e.g. a Linux desktop without gnome-keyring): a file only
+    you can read (chmod 600)."""
+    path = _key_file()
+    try:
+        if not keys:
+            path.unlink(missing_ok=True)
+            return True
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(keys, f)
+        os.chmod(path, 0o600)
+        return True
+    except OSError:
+        return False
+
+
+def _keyring():
+    """The OS keychain, or None if there isn't a usable one."""
+    try:
+        import keyring
+        from keyring.backends import fail
+
+        if isinstance(keyring.get_keyring(), fail.Keyring):
+            return None
+        return keyring
+    except Exception:  # no backend available / broken D-Bus
+        return None
 
 
 def get_api_key(provider: str = "anthropic") -> str:
     env = os.environ.get(_ENV[provider], "").strip()
     if env:
         return env
-    try:
-        import keyring
-
-        return (keyring.get_password(_KR_SERVICE, _KR_USER[provider]) or "").strip()
-    except Exception:  # no backend available
-        return ""
+    kr = _keyring()
+    if kr is not None:
+        try:
+            got = (kr.get_password(_KR_SERVICE, _KR_USER[provider]) or "").strip()
+            if got:
+                return got
+        except Exception:  # nosec B110 - locked/broken keychain: try the fallback file
+            pass
+    return str(_file_keys().get(provider, "")).strip()
 
 
 def set_api_key(key: str, provider: str = "anthropic") -> bool:
-    try:
-        import keyring
-
-        if key:
-            keyring.set_password(_KR_SERVICE, _KR_USER[provider], key.strip())
-        else:
-            try:
-                keyring.delete_password(_KR_SERVICE, _KR_USER[provider])
-            except Exception:  # nosec B110 - nothing stored yet
-                pass
-        return True
-    except Exception:
-        return False
+    key = key.strip()
+    kr = _keyring()
+    if kr is not None:
+        try:
+            if key:
+                kr.set_password(_KR_SERVICE, _KR_USER[provider], key)
+            else:
+                try:
+                    kr.delete_password(_KR_SERVICE, _KR_USER[provider])
+                except Exception:  # nosec B110 - nothing stored yet
+                    pass
+            keys = _file_keys()
+            if keys.pop(provider, None) is not None:
+                _write_file_keys(keys)
+            return True
+        except Exception:  # nosec B110 - keychain refused: use the fallback file
+            pass
+    keys = _file_keys()
+    if key:
+        keys[provider] = key
+    else:
+        keys.pop(provider, None)
+    return _write_file_keys(keys)

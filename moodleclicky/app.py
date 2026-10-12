@@ -67,6 +67,7 @@ class App:
             set_mode=self._set_mode,
             on_type=self.type_suggestion,
             type_hint=trigger_hint(settings),
+            on_show_me=self.show_me,
         )
         if not settings.buddy_visible:
             self.buddy.hide()
@@ -111,6 +112,33 @@ class App:
         self._via_card = False
         self.buddy.set_active(True)  # grow straight away so you know it heard you
         self.ask("")
+
+    def show_me(self) -> None:
+        """Ctrl+Alt+A / "Show me": glide your real mouse onto the answer, ready to click (never clicks)."""
+        exp = self.last_exp
+        if exp is None or not exp.answer_point:
+            self._say_briefly("No answer spot to show yet - double-tap Ctrl on a question first.")
+            return
+        from moodleclicky.pointer import glide
+
+        try:
+            glide(self.root, exp.answer_point)
+        except Exception:  # no mouse hook available
+            log.exception("couldn't move the mouse")
+            return
+        self.buddy.point_at(exp.answer_point, "here")
+        if self.bubble.state == "showing":
+            self._give_focus_back()
+
+    def _tap_heard(self, n: int) -> None:
+        """First Ctrl tap: a little hop so you know it's listening for the second."""
+        log.info("ctrl tap %d", n)
+        if self.busy or self.player.playing or self.quick.visible:
+            return
+        if self.settings.buddy_visible:
+            self.buddy.show()
+        self.buddy.set_active(True, big=1.25)
+        self.root.after(550, lambda: None if (self.busy or self.player.playing) else self.buddy.set_active(False))
 
     def _suggestion_up(self) -> bool:
         """A double-tap types only while the suggestion is on screen (speech bubble or card)."""
@@ -283,7 +311,7 @@ class App:
 
     def _heard(self, text: str) -> None:
         if not text:
-            self._say_briefly("Didn't catch that. Hold Right Ctrl and try again.", "🎙")
+            self._say_briefly("Didn't catch that. Hold Ctrl and try again.", "🎙")
             return
         self._heard_text = text
         self._via_card = False
@@ -469,11 +497,13 @@ class App:
         self.pending_type = "" if exp.error else exp.type_text
         if self._compact():
             # Clicky-style: talk it through in the little speech bubble, then fade.
-            self.player.play(plan_lines(exp, trigger_hint(self.settings)))
+            self.player.play(plan_lines(exp, trigger_hint(self.settings), show_hint(self.settings)))
         else:
             self.buddy.set_active(False)
             self.bubble.show_explanation(exp, near, self.settings.open_on_answer, footer)
         self._give_focus_back()
+        if self.settings.move_mouse_to_answer and exp.answer_point and not exp.error and self.mode != "hint":
+            self.root.after(400, self.show_me)
 
     def _on_page(self, page: Page | None) -> None:
         if page and page.point:
@@ -512,6 +542,7 @@ class App:
             keys = {}
             ask_fn = self.on_trigger if s.trigger == "hotkey" else self.start_prompt
             for combo, fn in ((s.hotkey_ask, ask_fn), (s.hotkey_toggle, self.toggle_buddy),
+                              (s.hotkey_show, self.show_me),
                               (s.hotkey_notes, self.open_notetaker), (s.hotkey_mark, self.mark_moment)):
                 if combo and combo not in keys:
                     keys[combo] = lambda fn=fn: self.call_soon(fn)
@@ -529,15 +560,21 @@ class App:
         try:
             voice = self.settings.voice
             self._trigger = KeyTrigger(
-                self.settings.trigger, lambda: self.call_soon(self.on_trigger),
+                self.settings.trigger, self._fired,
+                on_tap=lambda n: self.call_soon(lambda: self._tap_heard(n)),
                 on_escape=lambda: self.call_soon(self.dismiss),
                 on_hold_start=(lambda: self.call_soon(self.listen_start)) if voice else None,
                 on_hold_end=(lambda: self.call_soon(self.listen_stop)) if voice else None,
                 on_hold_cancel=(lambda: self.call_soon(self.listen_cancel)) if voice else None)
             self._trigger.start()
+            log.info("wake-up key ready: %s", self.settings.trigger)
         except Exception:  # no keyboard hook available
             log.exception("double-tap trigger disabled")
             self._trigger = None
+
+    def _fired(self) -> None:
+        log.info("wake-up key fired")
+        self.call_soon(self.on_trigger)
 
     def _start_tray(self) -> None:
         try:
@@ -552,6 +589,7 @@ class App:
             item("Look at my screen now", lambda: self.call_soon(self.look_now)),
             item("Ask a question…", lambda: self.call_soon(self.start_prompt)),
             item("Show full answer", lambda: self.call_soon(self.show_full_answer)),
+            item("Move my mouse to the answer", lambda: self.call_soon(self.show_me)),
             item("Lecture / meeting notetaker…", lambda: self.call_soon(self.open_notetaker)),
             item("Settings…", lambda: self.call_soon(self.open_settings)),
             item("Open revision notes", lambda: self.call_soon(self.open_notes)),
@@ -573,6 +611,10 @@ def trigger_hint(s: Settings) -> str:
     return {"double_rctrl": "Right Ctrl ×2", "double_ctrl": "Ctrl ×2", "triple_ctrl": "Ctrl ×3",
             "right_ctrl": "Right Ctrl"}.get(
         s.trigger, "Ctrl+Alt+Space")
+
+
+def show_hint(s: Settings) -> str:
+    return s.hotkey_show.replace("<", "").replace(">", "").title() if s.hotkey_show else ""
 
 
 def tray_image(color: str):

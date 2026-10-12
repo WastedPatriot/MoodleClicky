@@ -10,9 +10,9 @@
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-22c55e"></a>
 </p>
 
-Stuck on a Moodle quiz question, a coursework task or an error in your code? **Double-tap Right Ctrl.** MoodleClicky screenshots what's under your mouse, flies its little cursor buddy over to the part that matters, and talks you through it in a speech bubble, one step at a time. There's no chat window to open and nothing to type.
+Stuck on a Moodle quiz question, a coursework task or an error in your code? **Double-tap Ctrl.** MoodleClicky screenshots what's under your mouse, flies its little cursor buddy over to the part that matters, and talks you through it in a speech bubble, one step at a time. There's no chat window to open and nothing to type.
 
-If you're writing in a text box, it also suggests what goes there. Double-tap again and it types it in for you. You can also just ask it something: **hold Right Ctrl and talk.**
+If you're writing in a text box, it also suggests what goes there. Double-tap again and it types it in for you. You can also just ask it something: **hold Ctrl and talk.** Still stuck? **Ctrl + Alt + A** moves your mouse onto the answer.
 
 <p align="center"><img src="docs/demo.gif" alt="Demo: the cursor buddy explaining a Big-O question step by step" width="88%"></p>
 
@@ -46,33 +46,37 @@ You'll need an API key from [console.anthropic.com](https://console.anthropic.co
 ## Using it
 
 1. Hover over the thing you're stuck on.
-2. **Double-tap Right Ctrl.** The buddy grows, takes a look, and starts talking.
+2. **Double-tap Ctrl** (either one). The buddy hops on the first tap, then grows, takes a look, and starts talking.
 3. Read along. It points at each part as it explains, then fades away. Clicks go straight through it.
 
 ### Talking to it
 
-- **Say it:** hold **Right Ctrl**, ask your question out loud ("why is this one quadratic?"), and let go. Your voice is turned into text on your PC and never uploaded. The buddy looks at your screen and answers in the bubble.
+- **Say it:** hold **Ctrl**, ask your question out loud ("why is this one quadratic?"), and let go. Your voice is turned into text on your PC and never uploaded. The buddy looks at your screen and answers in the bubble.
 - **Type it:** press **Ctrl + Alt + Space**. A one-line box opens next to the buddy. Type, then press Enter.
 
 | Keys | |
 |---|---|
-| **Right Ctrl ×2** | Look at what's under the mouse and explain it |
-| **Hold Right Ctrl** and talk | Ask a question out loud; let go when you're done |
-| **Right Ctrl ×2** again (while it's talking) | Type the suggestion into the box you were in. Ctrl+Z undoes it |
+| **Ctrl ×2** | Look at what's under the mouse and explain it |
+| **Copilot key** | Same, with one press (laptops that have one) |
+| **Hold Ctrl** and talk | Ask a question out loud; let go when you're done |
+| **Ctrl ×2** again (while it's talking) | Type the suggestion into the box you were in. Ctrl+Z undoes it |
+| **Ctrl + Alt + A** | Move your mouse onto the answer (the right option, the box, the line). It never clicks |
 | **Esc** | Hide the speech bubble |
 | **Ctrl + Alt + Space** | Type a question in a small box by the buddy |
 | **Ctrl + Alt + N** | Lecture / meeting notetaker |
 | **Ctrl + Alt + M** | Mark "this bit matters" while recording |
 | **Ctrl + Alt + H** | Show / hide the buddy |
 
-Tapping Ctrl on its own does nothing in browsers, Word or IDEs, so it never gets in your way. Ctrl+C, Ctrl+V and Ctrl+click don't count as taps. It uses the **right** Ctrl because double-tapping the left one is PowerToys' *Find My Mouse*. You can change the key in Settings.
+Tapping Ctrl on its own does nothing in browsers, Word or IDEs, so it never gets in your way. Ctrl+C, Ctrl+V and Ctrl+click don't count as taps. If you use PowerToys' *Find My Mouse* (also Left Ctrl ×2), pick **Right Ctrl ×2** in Settings.
+
+**Not responding?** Tap at a normal pace: two taps inside about half a second. Check the tray icon is there (it isn't running otherwise). The log at `%APPDATA%\MoodleClicky\moodleclicky.log` shows a `ctrl tap` line for every tap it hears.
 
 ### Modes
 
 | | |
 |---|---|
 | **Breakdown** *(default)* | What the question is really asking → the steps → the answer → why it works |
-| **Hint** | Nudges only, never the answer. Typing help just gives you a sentence starter |
+| **Hint** | Nudges only, never the answer. Typing help just gives you a sentence starter. Ctrl + Alt + A shows *where* the answer is |
 | **Check** | Write your answer first; it marks your working and points at what's wrong |
 
 Want everything at once, with Back/Next and follow-up questions? Tray → **Show full answer**. If you prefer that card to the speech bubble every time, switch the bubble off in Settings.
@@ -113,13 +117,14 @@ Only record where you're allowed to, and tell your group first.
 ## How it works
 
 ```
-Right Ctrl ×2
+Ctrl ×2
   → hide our own windows, screenshot the monitor under the cursor (cursor ringed), JPEG
   → Claude / DeepSeek returns structured JSON:
-      { title, summary, type_text, steps: [{ text, label, x, y }], answer, why, check_yourself }
+      { title, summary, type_text, steps: [{ text, label, x, y }], answer, answer_x, answer_y, why, check_yourself }
   → title + summary stream into the speech bubble while the rest arrives
   → the buddy flies to each step's (x, y), mapped back from image to screen coordinates
-  → Right Ctrl ×2 again: refocus your window, paste type_text, restore your clipboard
+  → Ctrl ×2 again: refocus your window, paste type_text, restore your clipboard
+  → Ctrl + Alt + A: glide the real pointer to (answer_x, answer_y)
 ```
 
 <details>
@@ -134,6 +139,7 @@ Right Ctrl ×2
 | `moodleclicky/speech.py` | Speech bubble + the player that walks through the steps |
 | `moodleclicky/buddy.py` | The cursor buddy (follows, flies to targets, grows when active) |
 | `moodleclicky/typer.py` | Types a suggestion into the window you were in |
+| `moodleclicky/pointer.py` | Glides your mouse onto the answer |
 | `moodleclicky/bubble.py` | Full answer card |
 | `moodleclicky/lecture/` | Recorder (mic + WASAPI loopback), Whisper transcription, crash-safe sessions, notes |
 | `moodleclicky/updater.py` | Checks GitHub Releases, updates in place |
@@ -153,10 +159,10 @@ Every push runs the same checks on Linux and on a real **Windows** machine ([CI 
   - the notetaker's recorder, crash recovery and note formats
   - real Whisper transcription of synthesised speech
 - **UI test:** drives the real windows on a virtual screen:
-  - double-tap → speech bubble → buddy points → typing with clipboard restore → Esc → full card
+  - double-tap → speech bubble → buddy points → typing with clipboard restore → Esc → full card → **Show me** glides the pointer onto the answer
   - settings scrolling on a laptop-sized screen
 - **The built `.exe` tests itself** (`--selftest`) on Windows:
-  - real key events: Right Ctrl ×2 wakes it, Left Ctrl ×2 doesn't
+  - real key events at a relaxed human pace: either Ctrl ×2 wakes it, Ctrl+Shift doesn't, the Copilot key does, holding Ctrl is push-to-talk, and Right-Ctrl-only mode ignores Left Ctrl
   - a suggestion pasted into a real text box
   - the speech bubble, the notetaker, settings, and loading the speech model
 - **Installer test:** installs the fresh build with scripted answers, checks the shortcuts and saved settings, checks the app stays running, then uninstalls.

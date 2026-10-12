@@ -60,7 +60,7 @@ def main():
     d.text((712, 104), "MoodleClicky", font=title, fill=INK)
     sub = font(["DejaVuSans.ttf", "segoeui.ttf"], 21)
     d.text((716, 186), "A study buddy that lives by your cursor.", font=sub, fill=MUTED)
-    d.text((716, 218), "Double-tap Right Ctrl: it looks, points, explains.", font=sub, fill=MUTED)
+    d.text((716, 218), "Double-tap Ctrl: it looks, points, explains.", font=sub, fill=MUTED)
     pill = font(["DejaVuSans-Bold.ttf", "segoeuib.ttf"], 15)
     x = 716
     for label in ("Windows", "Claude / DeepSeek", "Lecture notetaker"):

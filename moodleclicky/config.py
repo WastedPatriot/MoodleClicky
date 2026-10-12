@@ -44,17 +44,19 @@ class Settings:
     deepseek_model: str = "deepseek-flash"  # must be a vision-capable DeepSeek model
     effort: str = "low"  # low = fastest replies; medium/high think longer
     mode: str = "breakdown"
-    trigger: str = "double_rctrl"  # double_rctrl | double_ctrl | right_ctrl | hotkey  (see triggers.py)
+    trigger: str = "double_ctrl"  # double_ctrl | double_rctrl | triple_ctrl | right_ctrl | hotkey (triggers.py)
     instant: bool = True  # look straight away; False = ask "what are you stuck on?" first
     compact: bool = True  # Clicky-style speech bubble by the buddy; False = the full card
     hotkey_ask: str = "<ctrl>+<alt>+<space>"  # always opens the type-a-question prompt
     hotkey_toggle: str = "<ctrl>+<alt>+h"
+    hotkey_show: str = "<ctrl>+<alt>+a"  # move your mouse onto the answer
+    move_mouse_to_answer: bool = False  # do that automatically once it has explained
     buddy_visible: bool = True
     buddy_color: str = "#2f80ed"
     open_on_answer: bool = False  # False = walk through the steps first
     save_notes: bool = True
     check_updates: bool = True  # look for a newer release on GitHub once a day
-    voice: bool = True  # hold the wake-up key (Right Ctrl) and speak your question
+    voice: bool = True  # hold Ctrl on its own and speak your question
     voice_model: str = "base.en"  # speech-to-text for push-to-talk (small + fast; runs on this PC)
     course_context: str = ""  # e.g. "Birkbeck BSc Computer Science, Year 2"
     max_image_edge: int = 1568
@@ -66,7 +68,7 @@ class Settings:
     whisper_model: str = "small.en"  # local speech-to-text: tiny.en | base.en | small.en | medium.en
     your_name: str = ""  # so group-meeting notes can pull out YOUR tasks
     start_with_windows: bool = False
-    config_version: int = 2
+    config_version: int = 3
     extra: dict = field(default_factory=dict)
 
     @classmethod
@@ -82,12 +84,15 @@ class Settings:
             if raw.get("effort", "medium") == "medium":
                 s.effort = "low"
             s.config_version = 2
+        if raw.get("config_version", 1) < 3 and raw.get("trigger") == "double_rctrl":
+            s.trigger = "double_ctrl"  # v0.6: Right-Ctrl-only confused people (many laptops have none)
+        s.config_version = 3
         if s.mode not in MODES:
             s.mode = "breakdown"
         if s.effort not in EFFORTS:
             s.effort = "low"
         if s.trigger not in ("double_rctrl", "double_ctrl", "triple_ctrl", "right_ctrl", "hotkey"):
-            s.trigger = "double_rctrl"
+            s.trigger = "double_ctrl"
         if s.provider not in PROVIDERS:
             s.provider = "anthropic"
         if s.whisper_model not in WHISPER_MODELS:

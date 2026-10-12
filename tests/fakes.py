@@ -14,6 +14,8 @@ SAMPLE = {
         {"text": "Multiply them: n x n.", "label": "", "x": -1, "y": -1},
     ],
     "answer": "O(n^2)\n```python\nfor i in range(n):\n    for j in range(n):\n        ...\n```",
+    "answer_x": 300,
+    "answer_y": 260,
     "why": "Nested loops multiply their iteration counts.",
     "check_yourself": "What if the inner loop ran only 10 times?",
 }

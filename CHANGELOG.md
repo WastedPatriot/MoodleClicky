@@ -2,6 +2,16 @@
 
 All notable changes. Versions match the GitHub Releases that the installer downloads.
 
+## [0.7.0] - 2026-10-12
+### Changed
+- **Waking it up is more forgiving.** The default is now double-tap **either** Ctrl, with relaxed timing, so an unhurried double-tap counts. If you were on the old Right-Ctrl-only default, you're moved over automatically. PowerToys *Find My Mouse* users can still pick "Right Ctrl ×2" in Settings.
+- The buddy does a little hop on your first tap, so you can see it heard you.
+- Ctrl+click (multi-select, open in a new tab) never counts as a tap or as hold-to-talk.
+### Added
+- **The Copilot key** wakes it with one press, on laptops that have one.
+- **Show me the answer:** **Ctrl + Alt + A** (or **Show me** on the full card, or the tray) glides your real mouse pointer onto the answer: the right option, the box to fill in or the line to fix. It never clicks. In Hint mode this is the hint. You can also have it happen automatically in Settings.
+- Wake-up key presses are written to the log, which helps when it doesn't respond.
+
 ## [0.6.0] - 2026-10-12
 ### Added
 - **Talk to it:** hold Right Ctrl, ask out loud, let go. Speech is transcribed on your PC (Whisper `base.en`, preloaded in the background) and sent with a screenshot, and the answer appears in the speech bubble. You can turn it off in Settings.
@@ -59,6 +69,7 @@ All notable changes. Versions match the GitHub Releases that the installer downl
 ### Added
 - First version: the cursor buddy and pop-up with Breakdown / Hint / Check modes, follow-up questions, tray icon, settings, and daily revision notes.
 
+[0.7.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.7.0
 [0.6.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.6.0
 [0.5.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.5.0
 [0.4.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.4.0

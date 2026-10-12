@@ -85,14 +85,14 @@ class SettingsWindow:
         # -- General
         g = t.Card(body, "General", "How the buddy behaves.")
         g.pack(fill="x", pady=(0, 10))
-        self.trigger = tk.StringVar(w, TRIGGER_LABELS.get(s.trigger, TRIGGER_LABELS["double_rctrl"]))
+        self.trigger = tk.StringVar(w, TRIGGER_LABELS.get(s.trigger, TRIGGER_LABELS["double_ctrl"]))
         t.form_row(g.body, "Wake-up key", lambda p: t.combobox(
             p, self.trigger, [TRIGGER_LABELS[k] for k in TRIGGERS], readonly=True),
             hint="Tapping Ctrl on its own does nothing in browsers or Word, and Ctrl+C / Ctrl+V don't count. "
-                 "Press it again to type a suggestion into your box. Right Ctrl avoids PowerToys' Find My Mouse "
-                 "(Left Ctrl ×2).")
+                 "Press it again to type a suggestion into your box. The Copilot key works too. Use PowerToys' "
+                 "Find My Mouse? Pick Right Ctrl ×2.")
         self.voice = tk.BooleanVar(w, s.voice)
-        t.Toggle(g.body, self.voice, "Hold Right Ctrl to talk",
+        t.Toggle(g.body, self.voice, "Hold Ctrl to talk",
                  "Hold the wake-up key, ask out loud, let go. Speech is turned into text on this PC.").pack(
             fill="x", pady=(0, 10))
         self.instant = tk.BooleanVar(w, s.instant)
@@ -112,6 +112,10 @@ class SettingsWindow:
         self.open_answer = tk.BooleanVar(w, s.open_on_answer)
         t.Toggle(g.body, self.open_answer, "Jump straight to the answer", "Skip the walkthrough").pack(
             fill="x", pady=(0, 10))
+        self.move_mouse = tk.BooleanVar(w, s.move_mouse_to_answer)
+        t.Toggle(g.body, self.move_mouse, "Move my mouse to the answer",
+                 "After explaining, put the pointer on the right option or box (never clicks). "
+                 "Ctrl+Alt+A does it any time.").pack(fill="x", pady=(0, 10))
         self.course = tk.StringVar(w, s.course_context)
         t.form_row(g.body, "Your course (optional)", lambda p: t.Field(p, self.course,
                    placeholder="e.g. Birkbeck BSc Computer Science, Year 2"),
@@ -144,6 +148,7 @@ class SettingsWindow:
         h.pack(fill="x", pady=(0, 10))
         self.hk = {}
         for key, label in (("hotkey_ask", "Ask about my screen"), ("hotkey_toggle", "Show / hide buddy"),
+                           ("hotkey_show", "Move mouse to the answer"),
                            ("hotkey_notes", "Open notetaker"), ("hotkey_mark", "Mark important moment")):
             self.hk[key] = tk.StringVar(w, getattr(s, key))
             t.form_row(h.body, label, lambda p, k=key: t.Field(p, self.hk[k]), pady=(0, 8))
@@ -173,7 +178,7 @@ class SettingsWindow:
     def _save(self) -> None:
         s = self.settings
         s.buddy_visible = self.visible.get()
-        s.trigger = {v: k for k, v in TRIGGER_LABELS.items()}.get(self.trigger.get(), "double_rctrl")
+        s.trigger = {v: k for k, v in TRIGGER_LABELS.items()}.get(self.trigger.get(), "double_ctrl")
         s.instant = self.instant.get()
         s.voice = self.voice.get()
         s.compact = self.compact.get()
@@ -188,6 +193,7 @@ class SettingsWindow:
             setattr(s, key, var.get().strip() or getattr(s, key))
         s.buddy_color = self.color.get().strip() or s.buddy_color
         s.open_on_answer = self.open_answer.get()
+        s.move_mouse_to_answer = self.move_mouse.get()
         s.save_notes = self.notes.get()
         s.check_updates = self.updates.get()
         s.start_with_windows = self.autostart.get()

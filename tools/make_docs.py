@@ -62,6 +62,8 @@ BREAKDOWN = {
     "answer": "c. O(n²)\n\nTwo loops over the same list, one inside the other:\n```python\n"
               "for a in items:      # n times\n    for b in items:  # n times each\n"
               "        ...          # O(1)\n```\nn × n = n² steps.",
+    "answer_x": 350,
+    "answer_y": OPT_Y0 + 2 * OPT_H,
     "why": "Loops one after another ADD (n + n is still O(n)). Loops nested inside each other MULTIPLY "
            "(n × n = O(n²)). Constant work inside a loop never changes the Big-O.",
     "check_yourself": "If the inner loop were `for b in items[:10]:`, what would the Big-O be?",
@@ -196,7 +198,7 @@ def main() -> None:
     DOCS.mkdir(exist_ok=True)
     d = Director()
 
-    # --- demo GIF: follow -> double-tap Right Ctrl -> speech bubble talks it through ----------
+    # --- demo GIF: follow -> double-tap Ctrl -> speech bubble talks it through ----------
     import moodleclicky.speech as speech
 
     speech.reading_time = lambda text: 1.7  # brisker pauses so the GIF stays short
@@ -205,7 +207,7 @@ def main() -> None:
     d.pump(0.4)
     d.move(560, 420, steps=30, record=True)
     d.pump(0.5, record=True)
-    app.on_trigger()  # what a double-tap of Right Ctrl does
+    app.on_trigger()  # what a double-tap of Ctrl does
     d.wait_speech(app, record=True)
     stills = {}
     for _ in range(900):

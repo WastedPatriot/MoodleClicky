@@ -48,7 +48,7 @@ def reading_time(text: str) -> float:
     return max(2.6, min(12.0, 1.6 + len(text.split()) * 0.33))
 
 
-def plan_lines(exp: Explanation, type_hint: str = "Right Ctrl ×2") -> list[Line]:
+def plan_lines(exp: Explanation, type_hint: str = "Ctrl ×2", show_hint: str = "Ctrl+Alt+A") -> list[Line]:
     if exp.error:
         return [Line(plain(exp.summary or exp.error), "HMM", secs=6.0)]
     lines = []
@@ -58,7 +58,9 @@ def plan_lines(exp: Explanation, type_hint: str = "Right Ctrl ×2") -> list[Line
     for i, s in enumerate(exp.steps, 1):
         lines.append(Line(plain(s.text), f"{i} / {n}", s.point, s.label))
     if exp.answer:
-        lines.append(Line(plain(exp.answer), "ANSWER"))
+        lines.append(Line(plain(exp.answer), "ANSWER", exp.answer_point, "answer"))
+    elif exp.answer_point and show_hint:  # hint mode: no answer, but it can show you where to look
+        lines.append(Line(f"Still stuck? {show_hint} moves your mouse to where the answer is.", "HINT"))
     if exp.why:
         lines.append(Line(plain(exp.why), "WHY"))
     for ln in lines:
@@ -241,7 +243,7 @@ class QuickAsk:
         self.field = t.Field(inner, placeholder="e.g. why is this O(n²)?", width=34, bg=t.CARD)
         self.field.pack(fill="x", pady=(6, 4))
         self.entry = self.field.entry
-        tk.Label(inner, text="Enter to ask  ·  Esc to cancel  ·  or hold Right Ctrl and just say it", bg=t.CARD,
+        tk.Label(inner, text="Enter to ask  ·  Esc to cancel  ·  or hold Ctrl and just say it", bg=t.CARD,
                  fg=t.SUBTLE, font=f.tiny, anchor="w").pack(fill="x")
         self.entry.bind("<Return>", lambda _e: self._submit())
         self.entry.bind("<Escape>", lambda _e: self.close(cancelled=True))

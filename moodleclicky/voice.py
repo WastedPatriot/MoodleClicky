@@ -1,4 +1,4 @@
-"""Push-to-talk: hold Right Ctrl, speak, let go. Records the mic while held and transcribes it on this PC."""
+"""Push-to-talk: hold Ctrl on its own, speak, let go. Records the mic while held and transcribes it on this PC."""
 
 from __future__ import annotations
 

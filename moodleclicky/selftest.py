@@ -217,47 +217,66 @@ def check_keyboard(root, report: list[str]) -> None:
     """Real key events (Windows): double-tap Ctrl wakes the buddy; a suggestion is pasted into a text box."""
     import tkinter as tk
 
-    from pynput.keyboard import Controller, Key
+    from pynput.keyboard import Controller, Key, KeyCode
 
     from moodleclicky.triggers import KeyTrigger
     from moodleclicky.typer import type_into
     from moodleclicky.winutil import foreground_window
 
     kb = Controller()
-    fired = []
-    trig = KeyTrigger("double_rctrl", lambda: fired.append(1))
-    trig.start()
-    time.sleep(0.5)
-    def double_tap(key):
+
+    def double_tap(key, down=0.09, gap=0.28):  # human-ish, unhurried timing
         for _ in range(2):
             kb.press(key)
-            time.sleep(0.05)
+            time.sleep(down)
             kb.release(key)
-            time.sleep(0.12)
-        time.sleep(0.6)
+            time.sleep(gap)
+        time.sleep(0.7)
 
-    with kb.pressed(Key.ctrl_r):  # Ctrl used with another key (Ctrl+Shift here - harmless) must NOT trigger
+    fired, taps = [], []
+    trig = KeyTrigger("double_ctrl", lambda: fired.append(1), on_tap=taps.append)
+    trig.start()
+    time.sleep(0.5)
+    with kb.pressed(Key.ctrl_l):  # Ctrl used with another key (Ctrl+Shift here - harmless) must NOT trigger
         kb.press(Key.shift)
         kb.release(Key.shift)
-    time.sleep(0.6)
-    double_tap(Key.ctrl_l)  # Left Ctrl x2 is PowerToys Find My Mouse - must NOT trigger
-    double_tap(Key.ctrl_r)  # Right Ctrl x2 = wake up
+    time.sleep(0.7)
+    check(not fired, "Ctrl+Shift woke the buddy")
+    double_tap(Key.ctrl_l)  # Left Ctrl x2 = wake up
+    check(fired == [1], f"double-tap Left Ctrl fired {len(fired)} times (want 1)")
+    double_tap(Key.ctrl_r)  # Right Ctrl x2 too
+    check(fired == [1, 1], f"double-tap Right Ctrl fired {len(fired)} times in total (want 2)")
+    check(taps == [1, 1], f"first-tap feedback {taps} (want [1, 1])")
+    if sys.platform == "win32":  # the Copilot key sends F23 (a Windows virtual-key code)
+        kb.press(KeyCode.from_vk(KeyTrigger.COPILOT_VK))
+        kb.release(KeyCode.from_vk(KeyTrigger.COPILOT_VK))
+        time.sleep(0.4)
+        check(fired == [1, 1, 1], f"Copilot key (F23) fired {len(fired) - 2} times (want 1)")
     trig.stop()
-    check(fired == [1], f"double-tap Right Ctrl fired {len(fired)} times (want 1)")
+
+    fired.clear()
+    trig = KeyTrigger("double_rctrl", lambda: fired.append(1))
+    trig.start()
+    time.sleep(0.4)
+    double_tap(Key.ctrl_l)  # Right-Ctrl-only mode (for PowerToys Find My Mouse users) ignores Left Ctrl
+    double_tap(Key.ctrl_r)
+    trig.stop()
+    check(fired == [1], f"Right-Ctrl-only mode fired {len(fired)} times (want 1)")
 
     holds = []
-    trig = KeyTrigger("double_rctrl", lambda: holds.append("tap"),
+    trig = KeyTrigger("double_ctrl", lambda: holds.append("tap"),
                       on_hold_start=lambda: holds.append("start"), on_hold_end=lambda: holds.append("end"))
     trig.start()
     time.sleep(0.4)
-    kb.press(Key.ctrl_r)  # hold Right Ctrl ~1 s = push-to-talk
+    kb.press(Key.ctrl_l)  # hold Ctrl ~1 s = push-to-talk
     time.sleep(1.0)
-    kb.release(Key.ctrl_r)
+    kb.release(Key.ctrl_l)
     time.sleep(0.4)
     trig.stop()
-    check(holds == ["start", "end"], f"holding Right Ctrl gave {holds} (want start, end)")
-    report.append("ok    double-tap Right Ctrl wakes the buddy (Left Ctrl x2 and Ctrl+other key don't)")
-    report.append("ok    holding Right Ctrl = push-to-talk (start on hold, stop on release, not a tap)")
+    check(holds == ["start", "end"], f"holding Ctrl gave {holds} (want start, end)")
+    report.append("ok    double-tap Ctrl (left or right) wakes the buddy; Ctrl+other key doesn't; Copilot key does")
+    report.append("ok    Right-Ctrl-only mode ignores Left Ctrl (PowerToys Find My Mouse)")
+    report.append("ok    holding Ctrl = push-to-talk (start on hold, stop on release, not a tap)")
 
     win = tk.Toplevel(root)
     win.title("MoodleClicky self-test box")

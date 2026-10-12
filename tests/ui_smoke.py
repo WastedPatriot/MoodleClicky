@@ -67,7 +67,7 @@ def main(out=None):
 
     b.jump_answer()
     pump(root, 0.1)
-    assert b.current().kind == "answer" and app.buddy.target_point is None
+    assert b.current().kind == "answer" and app.buddy.target_point == app.last_exp.answer_point  # points at it
     assert "range(n)" in b.body.get("1.0", "end")
 
     b.entry.insert(0, "why squared?")
@@ -189,9 +189,30 @@ def main(out=None):
     app.show_full_answer()
     pump(root, 0.2)
     assert b.state == "showing" and b.title.cget("text") == SAMPLE["title"]
-    b.close()
+    assert b.show_btn.winfo_ismapped()  # "Show me" is offered because the reply says where the answer is
 
-    # --- talk to it: hold Right Ctrl, speak, let go -------------------------------------------
+    # Ctrl+Alt+A / "Show me": glide the real pointer onto the answer (never clicks)
+    class FakeMouse:
+        position = (5, 5)
+        moves = []
+
+        def __setattr__(self, k, v):
+            FakeMouse.moves.append(v)
+            object.__setattr__(self, k, v)
+
+    import moodleclicky.pointer as pointer
+
+    real_glide = pointer.glide
+    pointer.glide = lambda root_, to: real_glide(root_, to, mouse=FakeMouse())
+    b.show_btn.invoke()
+    pump(root, 0.6)
+    pointer.glide = real_glide
+    assert FakeMouse.moves and FakeMouse.moves[-1] == app.last_exp.answer_point, FakeMouse.moves[-3:]
+    assert len(FakeMouse.moves) > 5  # a glide, not a jump
+    b.close()
+    print("ok    show me: pointer glides onto the answer")
+
+    # --- talk to it: hold Ctrl, speak, let go -------------------------------------------
     import numpy as np
 
     from moodleclicky.lecture.transcribe import Segment

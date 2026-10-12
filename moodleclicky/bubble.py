@@ -32,7 +32,7 @@ def build_pages(exp: Explanation) -> list[Page]:
     for i, s in enumerate(exp.steps, 1):
         pages.append(Page("step", f"Step {i} of {n}", s.text, s.point, s.label))
     if exp.answer:
-        pages.append(Page("answer", "Answer", exp.answer))
+        pages.append(Page("answer", "Answer", exp.answer, exp.answer_point, "answer" if exp.answer_point else ""))
     if exp.why:
         pages.append(Page("why", "Why it works", exp.why))
     if exp.check_yourself:
@@ -69,8 +69,10 @@ class Bubble:
         set_mode: Callable[[str], None],
         on_type: Callable[[], None] | None = None,
         type_hint: str = "Ctrl Ctrl",
+        on_show_me: Callable[[], None] | None = None,
     ):
         self.root = root
+        self.on_show_me = on_show_me or (lambda: None)
         self.on_type = on_type or (lambda: None)
         self.type_text = ""
         self.on_ask, self.on_follow_up = on_ask, on_follow_up
@@ -147,6 +149,8 @@ class Bubble:
         self.back_btn.pack(side="left")
         self.next_btn.pack(side="left", padx=6)
         self.answer_btn.pack(side="right")
+        self.show_btn = t.PillButton(nav, "Show me", lambda: self.on_show_me(), kind="ghost",
+                                     tooltip="Move my mouse to the answer (Ctrl+Alt+A)")
 
         ask = self.ask_row = tk.Frame(inner, bg=t.CARD)
         ask.pack(fill="x", pady=(12, 0))
@@ -236,6 +240,10 @@ class Bubble:
             self.answer_btn.pack(side="right")
         else:
             self.answer_btn.pack_forget()
+        if exp.answer_point:
+            self.show_btn.pack(side="right", padx=(0, 6))
+        else:
+            self.show_btn.pack_forget()
         self.idx = next((i for i, p in enumerate(self.pages) if p.kind == "answer"), 0) if open_on_answer else 0
         self._render(near)
         self._show()

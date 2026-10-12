@@ -39,6 +39,9 @@ How you help:
 - "check_yourself": one quick question that tests whether they actually understood.
 - Keep the student's own words, code style and language. Code snippets short; no essays.
 - If nothing study-related is visible, say so kindly in summary and give no steps.
+- "answer_x"/"answer_y": where the answer goes or is, IN THE SCREENSHOT - the correct option's radio button
+  or tick box, the box to type it into, the line of code to change, the button to press. Set it in every
+  mode (in hint mode it is the hint: "look here"). x = -1, y = -1 if there's no single place.
 
 Typing help ("type_text"):
 - If the student is clearly writing in a text box / editor at or near the cursor (an answer box, an essay
@@ -77,10 +80,13 @@ SCHEMA = {
             },
         },
         "answer": {"type": "string"},
+        "answer_x": {"type": "integer"},
+        "answer_y": {"type": "integer"},
         "why": {"type": "string"},
         "check_yourself": {"type": "string"},
     },
-    "required": ["title", "summary", "type_text", "steps", "answer", "why", "check_yourself"],
+    "required": ["title", "summary", "type_text", "steps", "answer", "answer_x", "answer_y", "why",
+                 "check_yourself"],
     "additionalProperties": False,
 }
 
@@ -101,6 +107,7 @@ class Explanation:
     why: str = ""
     check_yourself: str = ""
     type_text: str = ""
+    answer_point: tuple[int, int] | None = None  # real screen coordinates of where the answer is/goes
     cost_usd: float = 0.0
     error: str = ""
 
@@ -123,7 +130,14 @@ def parse_explanation(text: str, shot: Shot | None) -> Explanation:
         why=data.get("why", "").strip(),
         check_yourself=data.get("check_yourself", "").strip(),
         type_text=(data.get("type_text") or "").strip("\n"),
+        answer_point=_point(data.get("answer_x", -1), data.get("answer_y", -1), shot),
     )
+
+
+def _point(x, y, shot: Shot | None) -> tuple[int, int] | None:
+    if shot is None or not isinstance(x, int | float) or not isinstance(y, int | float) or x < 0 or y < 0:
+        return None
+    return shot.to_screen(x, y)
 
 
 _PARTIAL_KEYS = ("title", "summary", "type_text")

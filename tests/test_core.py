@@ -336,7 +336,60 @@ def test_trigger_modes_watch_the_right_keys():
     assert all(any_ctrl._is_watched(k, kb) for k in ("ctrl", "ctrl_l", "ctrl_r"))
     assert KeyTrigger("right_ctrl", lambda: None).tap.taps_needed == 1
     assert KeyTrigger("triple_ctrl", lambda: None).tap.taps_needed == 3
-    assert Settings().trigger == "double_rctrl"
+    assert Settings().trigger == "double_ctrl"
+
+
+def test_old_right_ctrl_default_is_migrated(tmp_path):
+    p = tmp_path / "config.json"
+    p.write_text(json.dumps({"trigger": "double_rctrl", "config_version": 2, "effort": "high"}))
+    s = Settings.load(p)
+    assert s.trigger == "double_ctrl" and s.config_version == 3 and s.effort == "high"
+    p.write_text(json.dumps({"trigger": "double_rctrl", "config_version": 3}))  # chosen on purpose: kept
+    assert Settings.load(p).trigger == "double_rctrl"
+
+
+def test_first_tap_feedback_and_relaxed_timing():
+    from moodleclicky.triggers import DoubleTap
+
+    clock = Clock()
+    fired, taps = [], []
+    d = DoubleTap(lambda: fired.append(1), clock=clock, on_tap=taps.append)
+    for _ in range(2):  # 0.1 s press, 0.35 s gap: a relaxed human double-tap
+        d.watched_down()
+        clock.t += 0.1
+        d.watched_up()
+        clock.t += 0.35
+    assert fired == [1] and taps == [1]
+
+
+def test_copilot_key_vk():
+    from types import SimpleNamespace
+
+    from moodleclicky.triggers import KeyTrigger
+
+    assert KeyTrigger._vk(SimpleNamespace(vk=0x86)) == KeyTrigger.COPILOT_VK
+    assert KeyTrigger._vk(SimpleNamespace(value=SimpleNamespace(vk=0x86))) == 0x86
+    assert KeyTrigger._vk(SimpleNamespace()) is None
+
+
+def test_answer_point_and_glide():
+    from moodleclicky.brain import parse_explanation
+    from moodleclicky.pointer import glide_path
+    from moodleclicky.speech import plan_lines
+
+    shot = build_shot(Image.new("RGB", (800, 600)), 100, 50, (110, 60), 800)
+    exp = parse_explanation(json.dumps({**SAMPLE, "answer_x": 200, "answer_y": 300}), shot)
+    assert exp.answer_point == shot.to_screen(200, 300)
+    assert parse_explanation(json.dumps({**SAMPLE, "answer_x": -1, "answer_y": -1}), shot).answer_point is None
+    assert parse_explanation(json.dumps(SAMPLE), shot).answer_point is None  # old replies without it
+    path = glide_path((0, 0), (300, 120))
+    assert path[-1] == (300, 120) and len(path) == 18
+    assert all(0 <= x <= 300 and 0 <= y <= 120 for x, y in path)
+    lines = plan_lines(exp)
+    ans = next(ln for ln in lines if ln.tag == "ANSWER")
+    assert ans.point == exp.answer_point
+    exp.answer = ""  # hint mode: no answer, but it can still show where to look
+    assert any(ln.tag == "HINT" and "Ctrl+Alt+A" in ln.text for ln in plan_lines(exp))
 
 
 def test_triple_tap():

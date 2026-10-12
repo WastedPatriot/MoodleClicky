@@ -84,11 +84,3 @@ All notable changes. Versions match the GitHub Releases that the installer downl
 - First version: the cursor buddy and pop-up with Breakdown / Hint / Check modes, follow-up questions, tray icon, settings, and daily revision notes.
 
 [0.8.1]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.8.1
-[0.8.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.8.0
-[0.7.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.7.0
-[0.6.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.6.0
-[0.5.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.5.0
-[0.4.0]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.4.0
-[0.3.2]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.3.2
-[0.3.1]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.3.1
-[0.2.1]: https://github.com/WastedPatriot/MoodleClicky/releases/tag/v0.2.1
